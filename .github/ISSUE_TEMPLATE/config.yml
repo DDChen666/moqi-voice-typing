@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: 安裝、權限、快捷鍵沒反應
-    url: https://github.com/DDChen666/moqi/blob/main/docs/安裝教學-Mac.md
+    url: https://github.com/DDChen666/moqi-voice-typing/blob/main/docs/安裝教學-Mac.md
     about: 第一次打開被擋、「已損毀」、按了沒反應，先看安裝教學。
   - name: 資安問題
-    url: https://github.com/DDChen666/moqi/blob/main/SECURITY.md
+    url: https://github.com/DDChen666/moqi-voice-typing/blob/main/SECURITY.md
     about: 請不要公開回報資安漏洞，照 SECURITY.md 的方式私下聯絡。

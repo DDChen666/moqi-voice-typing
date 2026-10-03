@@ -18,7 +18,7 @@
 ## 開發
 
 ```sh
-git clone https://github.com/DDChen666/moqi.git
+git clone https://github.com/DDChen666/moqi-voice-typing.git
 cd moqi
 bun install
 bun run tauri dev

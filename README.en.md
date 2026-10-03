@@ -6,7 +6,7 @@
 <br>
 
 <p align="center">
-  <a href="https://github.com/DDChen666/moqi/releases/latest"><img src="docs/media/download-en.png" width="300" alt="Download for macOS"></a>
+  <a href="https://github.com/DDChen666/moqi-voice-typing/releases/latest"><img src="docs/media/download-en.png" width="300" alt="Download for macOS"></a>
 </p>
 
 <p align="center">
@@ -68,7 +68,7 @@ Hold the right Option key, speak, let go — the text appears at your cursor. Mo
 
 ## Get started
 
-1. [Download](https://github.com/DDChen666/moqi/releases/latest) `Moqi_1.0.0_aarch64.dmg` and drag Moqi into Applications.
+1. [Download](https://github.com/DDChen666/moqi-voice-typing/releases/latest) `Moqi_1.0.0_aarch64.dmg` and drag Moqi into Applications.
 2. The first launch is blocked because Moqi isn't signed with a paid Apple Developer ID. Open **System Settings → Privacy & Security** and click **Open Anyway**. If macOS says the app "is damaged", run `xattr -dr com.apple.quarantine /Applications/Moqi.app` in Terminal.
 3. Follow the three setup steps: allow permissions, choose Raw or Tidy, and try a sentence.
 
