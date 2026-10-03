@@ -59,7 +59,7 @@ param(
             platforms = [ordered]@{
                 'windows-x86_64' = [ordered]@{
                     signature = (Get-Content $sig -Raw).Trim()
-                    url       = "https://github.com/DDChen666/moqi/releases/download/v$version/$name"
+                    url       = "https://github.com/DDChen666/moqi-voice-typing/releases/download/v$version/$name"
                 }
             }
         }

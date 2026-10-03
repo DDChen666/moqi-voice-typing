@@ -355,7 +355,10 @@ async fn send(
     if openrouter {
         // OpenRouter's app attribution: names Moqi, carries nothing of the user's.
         request = request
-            .header("HTTP-Referer", "https://github.com/DDChen666/moqi")
+            .header(
+                "HTTP-Referer",
+                "https://github.com/DDChen666/moqi-voice-typing",
+            )
             .header("X-Title", "Moqi");
     }
     request.send().await.map_err(|e| {

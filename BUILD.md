@@ -18,7 +18,7 @@
 ## 開發
 
 ```sh
-git clone https://github.com/DDChen666/moqi.git
+git clone https://github.com/DDChen666/moqi-voice-typing.git
 cd moqi
 bun install
 bun run tauri dev
@@ -118,7 +118,7 @@ open /Applications/Moqi.app
 ### 編譯
 
 ```powershell
-git clone https://github.com/DDChen666/moqi.git C:\src\moqi
+git clone https://github.com/DDChen666/moqi-voice-typing.git C:\src\moqi
 cd C:\src\moqi
 bun install
 .\scripts\windows\env.ps1              # 每開一個新的 PowerShell 都要先跑一次

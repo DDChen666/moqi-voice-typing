@@ -67,7 +67,7 @@
   "description": "默契 Moqi — local-first Mandarin/English dictation for macOS",
   "repository": {
     "type": "git",
-    "url": "https://github.com/DDChen666/moqi"
+    "url": "https://github.com/DDChen666/moqi-voice-typing"
   },
   "license": "MIT"
 }

@@ -82,7 +82,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDUzMzVFNUI0NzVGQzc0QTcKUldTbmRQeDF0T1UxVTlnT1R2VUYxczh5QXpnUGFDWlFuUnp6eDJsOExQaE9XMmRhT2c4N1pMOVMK",
       "endpoints": [
-        "https://github.com/DDChen666/moqi/releases/latest/download/latest.json"
+        "https://github.com/DDChen666/moqi-voice-typing/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"

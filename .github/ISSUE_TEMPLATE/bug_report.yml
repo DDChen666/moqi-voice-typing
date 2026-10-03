@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        謝謝你回報！先看看 [常見問題](https://github.com/DDChen666/moqi/blob/main/docs/使用指南.md#常見問題) 和 [安裝教學](https://github.com/DDChen666/moqi/blob/main/docs/安裝教學-Mac.md)，很多狀況那裡有解法。
+        謝謝你回報！先看看 [常見問題](https://github.com/DDChen666/moqi-voice-typing/blob/main/docs/使用指南.md#常見問題) 和 [安裝教學](https://github.com/DDChen666/moqi-voice-typing/blob/main/docs/安裝教學-Mac.md)，很多狀況那裡有解法。
         **請不要貼 API key、錄音或你口述的私人內容。**
   - type: textarea
     id: what

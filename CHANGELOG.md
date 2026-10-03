@@ -46,4 +46,4 @@
 - 讀取輔助使用屬性時，屬性不存在會讓 App 當掉。
 - 鑰匙圈的密碼視窗在說話途中跳出，導致錄音停不下來；改成打開 App 時就先讀取。
 
-[1.0.0]: https://github.com/DDChen666/moqi/releases/tag/v1.0.0
+[1.0.0]: https://github.com/DDChen666/moqi-voice-typing/releases/tag/v1.0.0
