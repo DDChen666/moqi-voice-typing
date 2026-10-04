@@ -10,6 +10,7 @@
 //!   acceptance criteria 1 and 2, and feeds the home page and history
 //!   ([`super::stats`]). It never leaves the machine.
 
+use std::collections::HashSet;
 use std::io::Write;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
@@ -189,6 +190,11 @@ pub fn begin(app: &AppHandle, pressed: Instant) {
             selection: None,
         });
     }
+    if cfg.learn_from_edits == Some(true) && !cfg.edit_selection {
+        if let Some(pid) = front_app().map(|f| f.pid) {
+            std::thread::spawn(move || wake_accessibility(pid));
+        }
+    }
     read_selection(app, &cfg, event);
 }
 
@@ -213,6 +219,9 @@ fn read_selection(app: &AppHandle, cfg: &super::config::YuyinConfig, event: Cont
     let generation = generation();
     let app = app.clone();
     std::thread::spawn(move || {
+        if wake_accessibility(pid) {
+            std::thread::sleep(Duration::from_millis(300));
+        }
         let Some(text) = platform::selected_text(pid).filter(|t| !t.trim().is_empty()) else {
             debug!("edit by voice: nothing selected");
             return;
@@ -258,6 +267,21 @@ pub fn front_app() -> Option<FrontApp> {
         .lock()
         .ok()
         .and_then(|g| g.as_ref().and_then(|s| s.front.clone()))
+}
+
+/// Apps already asked to expose their text fields this run.
+static WOKEN: Lazy<Mutex<HashSet<i32>>> = Lazy::new(|| Mutex::new(HashSet::new()));
+
+/// Ask `pid` once to expose its text fields (see `platform::wake_accessibility`),
+/// so learning from edits and editing the selection can read them. True if it
+/// was asked just now (its fields take a moment to appear).
+fn wake_accessibility(pid: i32) -> bool {
+    let first = WOKEN.lock().map(|mut w| w.insert(pid)).unwrap_or(false);
+    let woke = first && platform::wake_accessibility(pid);
+    if woke {
+        debug!("asked app {pid} to expose its text fields");
+    }
+    woke
 }
 
 /// The focused UI element of `pid`: its role and, when it holds plain text,
@@ -487,10 +511,16 @@ mod platform {
             value: *mut CFTypeRef,
         ) -> i32;
         fn AXUIElementSetMessagingTimeout(element: CFTypeRef, timeout: f32) -> i32;
+        fn AXUIElementSetAttributeValue(
+            element: CFTypeRef,
+            attribute: CFTypeRef,
+            value: CFTypeRef,
+        ) -> i32;
     }
 
     #[link(name = "CoreFoundation", kind = "framework")]
     extern "C" {
+        static kCFBooleanTrue: CFTypeRef;
         fn CFRelease(cf: CFTypeRef);
         fn CFEqual(a: CFTypeRef, b: CFTypeRef) -> u8;
         fn CFGetTypeID(cf: CFTypeRef) -> usize;
@@ -632,6 +662,36 @@ mod platform {
         Some((element, role))
     }
 
+    /// Ask `pid` to expose its text fields to Accessibility; true if it was
+    /// asked (its fields were hidden and it took the request).
+    ///
+    /// Chromium-based apps (VS Code, Slack, Notion, Discord, ChatGPT…) build
+    /// their accessibility tree only when an assistive app asks for it, so
+    /// until then their focused field can't be read: in VS Code, where the
+    /// user dictates most, learning from edits never saw a correction. Moqi
+    /// asks the way Wispr Flow-style dictation apps do, through
+    /// `AXManualAccessibility` (Electron's switch for exactly this). Measured
+    /// on the user's VS Code: the Claude Code input became readable, no
+    /// screen-reader prompt appeared, CPU and memory stayed within their
+    /// usual range. The app keeps it on until it quits.
+    pub fn wake_accessibility(pid: i32) -> bool {
+        if focused_element(pid).is_some() {
+            return false;
+        }
+        // SAFETY: AXUIElementCreateApplication returns a +1 reference.
+        let app = unsafe { AXUIElementCreateApplication(pid) };
+        if app.is_null() {
+            return false;
+        }
+        let app = Owned(app);
+        let Some(attribute) = cf_string("AXManualAccessibility") else {
+            return false;
+        };
+        // SAFETY: app and attribute are live; kCFBooleanTrue is a constant.
+        let err = unsafe { AXUIElementSetAttributeValue(app.0, attribute.0, kCFBooleanTrue) };
+        err == 0
+    }
+
     /// The text selected in `pid`'s focused element, to edit by voice. None
     /// for password fields, nothing selected, or an app that doesn't expose
     /// its selection to Accessibility.
@@ -716,6 +776,8 @@ mod platform_tests {
             let _ = focused_field(pid);
             assert!(selected_text(pid).is_none());
         }
+        // Nor is there anything to wake in it.
+        let _ = wake_accessibility(pid);
     }
 }
 
@@ -959,6 +1021,13 @@ mod platform {
                 CoCreateInstance(&CUIAutomation, None, CLSCTX_INPROC_SERVER).ok()
             }
         };
+    }
+
+    /// Nothing to ask on Windows: Chromium builds its UI Automation tree as
+    /// soon as a UIA client reads it. (Not verified on Windows; see the
+    /// macOS version.)
+    pub fn wake_accessibility(_pid: i32) -> bool {
+        false
     }
 
     /// The text selected in `pid`'s focused control: through UI
@@ -1219,5 +1288,9 @@ mod platform {
 
     pub fn selected_text(_pid: i32) -> Option<String> {
         None
+    }
+
+    pub fn wake_accessibility(_pid: i32) -> bool {
+        false
     }
 }
