@@ -2,11 +2,12 @@
 //!
 //! The visualiser maps a fixed loudness window, calibrated on laptop
 //! microphones, to bar heights. A quiet USB microphone records speech about
-//! 20 dB lower (the user's: −42 dBFS for its loudest tenth, at 100 % Windows
-//! gain), so most of each word fell below the window and the bars barely
-//! moved. This lifts the level by up to 20 dB so that the loudest recent
-//! sound reaches the top of the window, but never so far that the quietest
-//! recent sound (the room) enters it: between words the bars stay still.
+//! 12 dB lower than a MacBook's (the user's: −42 dBFS for its loudest tenth,
+//! at 100 % Windows gain, against −30), so most of each word fell below the
+//! window and the bars barely moved. This lifts the level by up to 20 dB so
+//! that the loudest recent sound reaches where a laptop's speech peaks, but
+//! never so far that the room enters the window: between words the bars stay
+//! still. A laptop microphone already peaks there and is left alone.
 //!
 //! Only the picture changes; the audio sent to the speech model is untouched.
 
@@ -15,12 +16,19 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 const MAX_BOOST_DB: f32 = 20.0;
-/// A loud word stops counting as "the loudest recent sound" this fast.
-const PEAK_FALL_DB_PER_S: f32 = 6.0;
-/// The room is the quietest moment in this long: long enough to include
-/// the silence before the first word or a pause between sentences.
+/// A loud word stops counting as "the loudest recent sound" this fast. The
+/// loudest sound measures the microphone, which doesn't change in a pause:
+/// at 6 dB/s a two-second pause lifted a laptop's next words (and its room)
+/// by 12 dB.
+const PEAK_FALL_DB_PER_S: f32 = 1.0;
+/// The room is measured over this long: long enough to include the silence
+/// before the first word or a pause between sentences.
 const FLOOR_WINDOW: Duration = Duration::from_secs(8);
-const FLOOR_SLOT: Duration = Duration::from_millis(500);
+/// The room is the level this share of recent frames is quieter than. Not
+/// the quietest frame: a pause's level swings by 10–20 dB from frame to
+/// frame, and lifting its quietest moment out of view left the rest of the
+/// pause lit.
+const ROOM_PERCENTILE: f32 = 0.1;
 // Digital silence says nothing about the room: streams often start with a
 // few buffers of zeros even where the microphone hisses, and some USB
 // microphones gate their pauses to zeros (the user's does) while the moments
@@ -34,20 +42,24 @@ pub struct LevelBoost {
     target_peak: f32,
     room_limit: f32,
     peak: f32,
-    /// Quietest level per half-second slot, newest last.
-    slots: VecDeque<(Instant, f32)>,
+    /// Recent frames' loudest band (real sound only), newest last.
+    frames: VecDeque<(Instant, f32)>,
     last: Option<Instant>,
 }
 
 impl LevelBoost {
-    /// `target_peak`: where the loudest sound should land (the window's top);
+    /// `target_peak`: where the loudest sound should land (where a laptop
+    /// microphone's speech peaks);
     /// `room_limit`: what the room must stay below (under the window's bottom).
     pub fn new(target_peak: f32, room_limit: f32) -> Self {
         let mut boost = Self {
             target_peak,
             room_limit,
-            peak: target_peak,
-            slots: VecDeque::new(),
+            // Nothing heard yet: the first word measures the microphone at
+            // once (the peak only falls slowly, so starting high would take
+            // a quiet microphone half a minute to learn).
+            peak: f32::NEG_INFINITY,
+            frames: VecDeque::new(),
             last: None,
         };
         boost.restore(Instant::now());
@@ -56,7 +68,7 @@ impl LevelBoost {
 
     /// A new recording: start from the last one's levels.
     pub fn restart(&mut self, now: Instant) {
-        self.slots.clear();
+        self.frames.clear();
         self.last = None;
         self.restore(now);
     }
@@ -65,7 +77,7 @@ impl LevelBoost {
         let remembered = REMEMBERED.lock().ok().and_then(|r| *r);
         if let Some((peak, room)) = remembered {
             self.peak = peak;
-            self.slots.push_back((now, room));
+            self.frames.push_back((now, room));
         }
     }
 
@@ -80,21 +92,14 @@ impl LevelBoost {
 
         self.peak = loudest.max(self.peak - PEAK_FALL_DB_PER_S * dt);
         if loudest.is_finite() {
-            match self.slots.back_mut() {
-                Some((started, quietest))
-                    if now.saturating_duration_since(*started) < FLOOR_SLOT =>
-                {
-                    *quietest = quietest.min(loudest);
-                }
-                _ => self.slots.push_back((now, loudest)),
-            }
+            self.frames.push_back((now, loudest));
         }
         while self
-            .slots
+            .frames
             .front()
             .is_some_and(|(t, _)| now.saturating_duration_since(*t) > FLOOR_WINDOW)
         {
-            self.slots.pop_front();
+            self.frames.pop_front();
         }
         let room = self.room();
         if let Ok(mut r) = REMEMBERED.lock() {
@@ -104,10 +109,12 @@ impl LevelBoost {
     }
 
     fn room(&self) -> f32 {
-        self.slots
-            .iter()
-            .map(|(_, q)| *q)
-            .fold(f32::INFINITY, f32::min)
+        let mut levels: Vec<f32> = self.frames.iter().map(|(_, l)| *l).collect();
+        if levels.is_empty() {
+            return f32::INFINITY;
+        }
+        levels.sort_by(f32::total_cmp);
+        levels[((levels.len() as f32 * ROOM_PERCENTILE) as usize).min(levels.len() - 1)]
     }
 }
 
@@ -128,8 +135,8 @@ mod tests {
         LevelBoost {
             target_peak: TOP,
             room_limit: ROOM_LIMIT,
-            peak: TOP,
-            slots: VecDeque::new(),
+            peak: f32::NEG_INFINITY,
+            frames: VecDeque::new(),
             last: None,
         }
     }
@@ -195,6 +202,30 @@ mod tests {
         word.extend([-100.0, -100.0, -52.0, -56.0, -54.0, -100.0]);
         let (boost, _) = run(&mut b, Instant::now(), &word.repeat(10));
         assert!((boost - 20.0).abs() < 0.01, "boost {boost}");
+    }
+
+    #[test]
+    fn a_pause_does_not_lift_the_next_words() {
+        // Speech that already peaks at the target, then a 3 s pause in a
+        // quiet room: the microphone hasn't changed, so neither may the boost.
+        let mut b = fresh();
+        let mut frames = [-30.0, -40.0].repeat(30);
+        frames.extend([-95.0; 90]);
+        let (boost, _) = run(&mut b, Instant::now(), &frames);
+        assert!(boost < 4.0, "boost {boost}");
+    }
+
+    #[test]
+    fn the_room_is_a_typical_pause_not_its_quietest_moment() {
+        // The room sits at -80 with a rare dip to -100. Measured by the dip,
+        // 20 dB of lift would light the bars through the whole pause.
+        let mut b = fresh();
+        let mut room = vec![-80.0; 19];
+        room.push(-100.0);
+        let mut frames = room.repeat(3);
+        frames.extend([-50.0, -80.0].repeat(30));
+        let (boost, _) = run(&mut b, Instant::now(), &frames);
+        assert!((boost - 8.0).abs() < 0.01, "boost {boost}");
     }
 
     #[test]

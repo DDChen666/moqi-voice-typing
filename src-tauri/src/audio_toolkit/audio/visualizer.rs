@@ -13,6 +13,11 @@ const DB_MIN: f32 = -68.0;
 const DB_MAX: f32 = -30.0;
 const GAIN: f32 = 1.3;
 const CURVE_POWER: f32 = 0.7;
+/// Yuyin fork: where a laptop microphone's dictation peaks in this scale
+/// (the loudest band, measured on a MacBook Air: about -38). A quieter
+/// microphone is lifted to here, not to DB_MAX, so it looks like a laptop's
+/// and a laptop's own waveform is left as it was.
+const BOOST_TARGET: f32 = -38.0;
 
 pub struct AudioVisualiser {
     fft: Arc<dyn Fft<f32>>,
@@ -84,7 +89,7 @@ impl AudioVisualiser {
             buffer: Vec::with_capacity(window_size * 2),
             window_size,
             buckets,
-            boost: LevelBoost::new(DB_MAX, DB_MIN - 4.0),
+            boost: LevelBoost::new(BOOST_TARGET, DB_MIN - 4.0),
         }
     }
 
