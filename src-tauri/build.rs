@@ -338,10 +338,18 @@ fn generate_tray_translations() {
     );
     out.push_str("    let mut m = HashMap::new();\n");
 
+    // Yuyin fork: a key a locale hasn't translated yet (Moqi's own tray items)
+    // falls back to English instead of an empty menu item.
+    let english = translations.get("en").cloned();
     for (lang, tray) in &translations {
         out.push_str(&format!("    m.insert(\"{lang}\", TrayStrings {{\n"));
         for (rust_field, json_key) in &fields {
-            let val = tray.get(json_key).and_then(|v| v.as_str()).unwrap_or("");
+            let val = tray
+                .get(json_key)
+                .and_then(|v| v.as_str())
+                .filter(|v| !v.is_empty())
+                .or_else(|| english.as_ref()?.get(json_key)?.as_str())
+                .unwrap_or("");
             out.push_str(&format!(
                 "        {rust_field}: \"{}\".to_string(),\n",
                 escape_string(val)
