@@ -982,7 +982,7 @@
     "learn": {
       "settingsGroup": "Learning",
       "title": "Learn from my corrections",
-      "description": "Correct a word Moqi typed and Moqi remembers it, so it's right next time. A correction to an English term is learned the first time; other corrections the second time (so a change of mind isn't mistaken for a misheard word). Learned words also join the dictionary, which recognition listens for.",
+      "description": "Correct a word Moqi typed and Moqi remembers it, so it's right next time. A misheard word (one corrected to an English term, or to a word that sounds alike) is learned the first time; a change that sounds different, the second time (so a change of mind isn't mistaken for a misheard word). Learned words also join the dictionary, which recognition listens for.",
       "privacy": "Compared on this computer only. Only the corrected words are kept (e.g. “Supabsee → Supabase”), never the whole text, and nothing is sent. Password boxes are never read. To see your corrections, Moqi asks apps like VS Code, Slack and Chrome to let Accessibility read their text boxes. Turned off, Moqi stops learning on its own; you can still teach it with “Correct” in the history. Manage what it learned on the Dictionary page.",
       "askTitle": "Let Moqi learn from your corrections?",
       "askBody": "When you correct a word Moqi typed (say “Supabsee” to “Supabase”), Moqi remembers it on this computer and gets it right next time. Only the corrected words are kept, never the whole text, and nothing is sent. You can change this in Settings.",
