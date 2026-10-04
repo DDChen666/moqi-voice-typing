@@ -330,6 +330,10 @@ fn initialize_core_logic(app_handle: &AppHandle) {
             "paste_last_transcript" => {
                 tray::paste_last_transcript(app);
             }
+            "correct_last" => {
+                show_main_window(app);
+                let _ = app.emit_to("main", "yuyin-correct-last", ());
+            }
             "unload_model" => {
                 let transcription_manager = app.state::<Arc<TranscriptionManager>>();
                 if !transcription_manager.is_model_loaded() {

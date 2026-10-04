@@ -5,6 +5,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { getVersion } from "@tauri-apps/api/app";
+import { listen } from "@tauri-apps/api/event";
 import {
   installUpdate,
   useAutomaticUpdateChecks,
@@ -60,7 +61,20 @@ export const MoqiWindow: React.FC<{
   const macTitleBar = useOsType() === "macos";
   const [page, setPage] = useState<Page>(initialPage);
   const [version, setVersion] = useState("");
+  // Bumped by the tray's "Correct last result": the history opens the newest
+  // entry for correcting.
+  const [correctLatest, setCorrectLatest] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const unlisten = listen("yuyin-correct-last", () => {
+      setPage("history");
+      setCorrectLatest((n) => n + 1);
+    });
+    return () => {
+      unlisten.then((f) => f()).catch(() => {});
+    };
+  }, []);
 
   useEffect(() => {
     getVersion()
@@ -167,7 +181,9 @@ export const MoqiWindow: React.FC<{
                 onOpenSettings={() => setPage("settings")}
               />
             )}
-            {page === "history" && <HistoryPage />}
+            {page === "history" && (
+              <HistoryPage correctLatest={correctLatest} />
+            )}
             {page === "dictionary" && <DictionaryPage />}
             {page === "settings" && <SettingsPage />}
             {page === "debug" && (

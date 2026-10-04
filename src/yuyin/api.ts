@@ -73,6 +73,16 @@ export interface SyncStatus {
   error: string | null;
 }
 
+/** What correcting a dictation in the history taught Moqi. */
+export interface Taught {
+  /** Corrections now applied to new dictations: [what Moqi typed, the fix]. */
+  corrections: [string, string][];
+  /** Rewordings noted, applied once the user makes them a second time. */
+  noted: [string, string][];
+  /** Words now in the dictionary (and listened for when recognizing). */
+  words: string[];
+}
+
 /** A correction learned from the user's edits (learn.rs). */
 export interface LearnedRule {
   from: string;
@@ -128,6 +138,9 @@ export const yuyinApi = {
     return next;
   },
   learned: () => invoke<LearnedRule[]>("yuyin_learned"),
+  /** Correct dictation `id` in the history; Moqi learns the corrected words. */
+  teach: (id: number, corrected: string) =>
+    invoke<Taught>("yuyin_teach", { id, corrected }),
   syncStatus: () => invoke<SyncStatus>("yuyin_sync_status"),
   /** Sync through `folder`, or stop with null. */
   setSyncFolder: (folder: string | null) =>

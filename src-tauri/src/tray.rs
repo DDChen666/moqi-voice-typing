@@ -528,6 +528,15 @@ fn build_menu(app: &AppHandle, inputs: &MenuInputs) -> tauri::Result<(Menu<tauri
         true,
         None::<&str>,
     )?;
+    // Yuyin fork: open the last result in the history to correct it, which
+    // teaches Moqi the corrected words (yuyin/learn.rs).
+    let correct_last_i = MenuItem::with_id(
+        app,
+        "correct_last",
+        &strings.correct_last,
+        true,
+        None::<&str>,
+    )?;
     let quit_i = MenuItem::with_id(app, "quit", &strings.quit, true, quit_accelerator)?;
     let separator = || PredefinedMenuItem::separator(app);
 
@@ -563,6 +572,7 @@ fn build_menu(app: &AppHandle, inputs: &MenuInputs) -> tauri::Result<(Menu<tauri
                 &separator()?,
                 &paste_last_transcript_i,
                 &copy_last_transcript_i,
+                &correct_last_i,
                 &separator()?,
                 &settings_i,
                 &check_updates_i,

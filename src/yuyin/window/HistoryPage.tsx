@@ -1,6 +1,7 @@
 // Yuyin fork: history as the design shows it — grouped by day, each entry
 // with where it was typed, what was pasted, and (expanded) the original
-// words, the recording, and exactly what left the machine.
+// words, the recording, and exactly what left the machine. Correcting an
+// entry here teaches Moqi the corrected words (learn.rs `teach`).
 import React, {
   useCallback,
   useEffect,
@@ -39,9 +40,23 @@ const EntryRow: React.FC<{
   onToggle: () => void;
   getAudioUrl: (fileName: string) => Promise<string | null>;
   onDelete: (id: number) => void;
-}> = ({ entry, meta, open, onToggle, getAudioUrl, onDelete }) => {
+  /** Its text is being corrected. */
+  correcting: boolean;
+  onCorrect: (correcting: boolean) => void;
+}> = ({
+  entry,
+  meta,
+  open,
+  onToggle,
+  getAudioUrl,
+  onDelete,
+  correcting,
+  onCorrect,
+}) => {
   const { t, i18n } = useTranslation();
   const [retrying, setRetrying] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
   const text = finalText(entry);
   const failed = text.trim().length === 0;
   const local = meta ? meta.sent_chars === 0 : false;
@@ -63,6 +78,48 @@ const EntryRow: React.FC<{
       toast.error(t("moqi.history.repasteFailed"));
     }
   };
+  useEffect(() => {
+    if (correcting) setDraft(finalText(entry));
+  }, [correcting, entry]);
+
+  // Save the correction; Moqi learns the corrected words at once.
+  const teach = async () => {
+    if (saving) return;
+    if (draft.trim() === text.trim() || !draft.trim()) {
+      onCorrect(false);
+      return;
+    }
+    setSaving(true);
+    try {
+      const taught = await yuyinApi.teach(entry.id, draft);
+      if (taught.corrections.length > 0) {
+        toast.success(
+          t("moqi.history.learned", {
+            list: taught.corrections
+              .map(([from, to]) => `${from} → ${to}`)
+              .join(t("moqi.history.listSeparator")),
+          }),
+        );
+      } else if (taught.noted.length > 0) {
+        toast.success(
+          t("moqi.history.noted", {
+            list: taught.noted
+              .map(([from, to]) => `${from} → ${to}`)
+              .join(t("moqi.history.listSeparator")),
+          }),
+        );
+      } else {
+        toast.success(t("moqi.history.correctedOnly"));
+      }
+      onCorrect(false);
+    } catch (e) {
+      console.error("Correcting failed:", e);
+      toast.error(t("moqi.history.correctFailed"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const retry = async () => {
     setRetrying(true);
     try {
@@ -79,46 +136,88 @@ const EntryRow: React.FC<{
   return (
     <div className="bg-surface rounded-[12px] shadow-[0_0_0_0.5px_var(--color-hairline),0_1px_3px_rgba(0,0,0,0.04)] flex flex-col">
       <div className="flex items-start gap-3 px-3.5 py-3">
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-expanded={open}
-          className="flex-1 min-w-0 text-start flex flex-col gap-1.5 cursor-pointer"
-        >
-          <span className="flex items-center gap-2 flex-wrap">
-            <span className="text-[11px] text-muted tabular-nums">
-              {timeLabel(entry.timestamp, i18n.language)}
+        {correcting ? (
+          <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+            <textarea
+              id={`correct-${entry.id}`}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                // Enter saves; Shift+Enter is a new line. Never while an input
+                // method is still composing (Enter picks its candidate).
+                if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  teach();
+                } else if (e.key === "Escape") {
+                  e.preventDefault();
+                  onCorrect(false);
+                }
+              }}
+              autoFocus
+              rows={Math.min(8, Math.max(2, draft.split("\n").length + 1))}
+              aria-label={t("moqi.history.correct")}
+              className="w-full resize-y rounded-[8px] bg-background px-2.5 py-2 text-[14px] leading-[1.55] text-text outline-none shadow-[0_0_0_1px_var(--color-hairline)] focus:shadow-[0_0_0_2px_var(--color-logo-primary)] select-text"
+            />
+            <span className="text-[11px] text-muted">
+              {t("moqi.history.correctHint")}
             </span>
-            {meta?.app && (
-              <span className="inline-flex items-center gap-1 text-[11px] px-[7px] py-[2px] rounded-[6px] bg-fill text-text/80">
-                <ContextIcon context={meta.context} size={11} />
-                {meta.app}
-              </span>
-            )}
-            {levelName && (
-              <span className="text-[11px] text-muted">{levelName}</span>
-            )}
-            {local && (
-              <span className="inline-flex items-center gap-[3px] text-[11px] text-positive">
-                <LockIcon size={10} />
-                {t("moqi.history.allLocal")}
-              </span>
-            )}
-          </span>
-          <span
-            className={`text-[14px] leading-[1.55] whitespace-pre-line break-words ${
-              failed ? "text-muted italic" : "text-text select-text"
-            }`}
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={open}
+            className="flex-1 min-w-0 text-start flex flex-col gap-1.5 cursor-pointer"
           >
-            {retrying
-              ? t("settings.history.transcribing")
-              : failed
-                ? t("moqi.history.failed")
-                : text}
-          </span>
-        </button>
+            <span className="flex items-center gap-2 flex-wrap">
+              <span className="text-[11px] text-muted tabular-nums">
+                {timeLabel(entry.timestamp, i18n.language)}
+              </span>
+              {meta?.app && (
+                <span className="inline-flex items-center gap-1 text-[11px] px-[7px] py-[2px] rounded-[6px] bg-fill text-text/80">
+                  <ContextIcon context={meta.context} size={11} />
+                  {meta.app}
+                </span>
+              )}
+              {levelName && (
+                <span className="text-[11px] text-muted">{levelName}</span>
+              )}
+              {local && (
+                <span className="inline-flex items-center gap-[3px] text-[11px] text-positive">
+                  <LockIcon size={10} />
+                  {t("moqi.history.allLocal")}
+                </span>
+              )}
+            </span>
+            <span
+              className={`text-[14px] leading-[1.55] whitespace-pre-line break-words ${
+                failed ? "text-muted italic" : "text-text select-text"
+              }`}
+            >
+              {retrying
+                ? t("settings.history.transcribing")
+                : failed
+                  ? t("moqi.history.failed")
+                  : text}
+            </span>
+          </button>
+        )}
         <div className="flex gap-1.5 shrink-0">
-          {failed ? (
+          {correcting ? (
+            <>
+              <SmallButton
+                onClick={teach}
+                disabled={saving}
+                className="!bg-logo-primary !text-white"
+              >
+                {t("moqi.history.saveCorrection")}
+              </SmallButton>
+              <SmallButton onClick={() => onCorrect(false)} disabled={saving}>
+                {t("moqi.history.cancelCorrection")}
+              </SmallButton>
+            </>
+          ) : failed ? (
             <SmallButton
               onClick={retry}
               disabled={retrying}
@@ -129,6 +228,12 @@ const EntryRow: React.FC<{
             </SmallButton>
           ) : (
             <>
+              <SmallButton
+                onClick={() => onCorrect(true)}
+                title={t("moqi.history.correctTitle")}
+              >
+                {t("moqi.history.correct")}
+              </SmallButton>
               <SmallButton onClick={copy}>{t("moqi.history.copy")}</SmallButton>
               <SmallButton
                 onClick={repaste}
@@ -231,7 +336,10 @@ const EntryRow: React.FC<{
   );
 };
 
-export const HistoryPage: React.FC = () => {
+export const HistoryPage: React.FC<{
+  /** Changes when the tray asks to correct the newest result. */
+  correctLatest?: number;
+}> = ({ correctLatest = 0 }) => {
   const { t, i18n } = useTranslation();
   const os = useOsType();
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
@@ -239,6 +347,7 @@ export const HistoryPage: React.FC = () => {
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [openId, setOpenId] = useState<number | null>(null);
+  const [correctingId, setCorrectingId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
   const loadingRef = useRef(false);
 
@@ -289,6 +398,19 @@ export const HistoryPage: React.FC = () => {
       unlisten.then((fn) => fn());
     };
   }, [loadPage, loadMeta]);
+
+  // The tray's "Correct last result": open the newest entry for correcting,
+  // once the list has loaded.
+  const handledCorrect = useRef(0);
+  useEffect(() => {
+    if (correctLatest === handledCorrect.current || loading) return;
+    handledCorrect.current = correctLatest;
+    const newest = entries.find((e) => finalText(e).trim().length > 0);
+    if (newest) {
+      setQuery("");
+      setCorrectingId(newest.id);
+    }
+  }, [correctLatest, loading, entries]);
 
   const getAudioUrl = useCallback(
     async (fileName: string) => {
@@ -371,6 +493,8 @@ export const HistoryPage: React.FC = () => {
                   }
                   getAudioUrl={getAudioUrl}
                   onDelete={remove}
+                  correcting={correctingId === e.id}
+                  onCorrect={(on) => setCorrectingId(on ? e.id : null)}
                 />
               ))}
             </div>
