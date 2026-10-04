@@ -139,7 +139,64 @@ pub fn apply(app: &AppHandle, text: &str) -> String {
     }
     // Longer first, so 蘇帕貝斯 wins over 貝斯.
     rules.sort_by_key(|(from, _)| std::cmp::Reverse(from.chars().count()));
-    apply_rules(text, &rules)
+    apply_by_sound(&apply_rules(text, &rules), &rules)
+}
+
+/// The recognizer spells an English name it doesn't know with whatever
+/// characters sound like it, and not the same ones each time: taught
+/// 深拓 -> Zentro, it wrote 申拓 the next time. So a correction to an English
+/// term also replaces any Chinese spelling that sounds like the one taught
+/// (two characters or more). Corrections between Chinese words stay exact:
+/// a word that sounds like 時辰 may well be meant.
+fn apply_by_sound(text: &str, rules: &[(String, String)]) -> String {
+    let by_sound: Vec<(Vec<Vec<String>>, &str)> = rules
+        .iter()
+        .filter(|(from, to)| {
+            to.chars().any(|c| c.is_ascii_alphabetic())
+                && from.chars().count() >= 2
+                && from.chars().all(is_han)
+        })
+        .filter_map(|(from, to)| syllables(from).map(|s| (s, to.as_str())))
+        .collect();
+    if by_sound.is_empty() {
+        return text.to_string();
+    }
+    use pinyin::ToPinyinMulti;
+    let chars: Vec<char> = text.chars().collect();
+    let readings: Vec<Option<Vec<String>>> = chars
+        .iter()
+        .map(|c| {
+            c.to_pinyin_multi()
+                .map(|r| r.into_iter().map(|p| fuzzy(p.plain())).collect())
+        })
+        .collect();
+    let sounds_like = |at: usize, syllables: &[Vec<String>]| {
+        at + syllables.len() <= chars.len()
+            && syllables.iter().enumerate().all(|(k, want)| {
+                readings[at + k]
+                    .as_ref()
+                    .is_some_and(|have| have.iter().any(|r| want.contains(r)))
+            })
+    };
+    let mut out = String::with_capacity(text.len());
+    let mut i = 0;
+    while i < chars.len() {
+        match by_sound.iter().find(|(syl, _)| sounds_like(i, syl)) {
+            Some((syl, to)) => {
+                out.push_str(to);
+                i += syl.len();
+            }
+            None => {
+                out.push(chars[i]);
+                i += 1;
+            }
+        }
+    }
+    out
+}
+
+fn is_han(c: char) -> bool {
+    ('\u{4e00}'..='\u{9fff}').contains(&c) || ('\u{3400}'..='\u{4dbf}').contains(&c)
 }
 
 fn apply_rules(text: &str, rules: &[(String, String)]) -> String {
@@ -925,6 +982,20 @@ mod tests {
         store.rules[0].dismissed = true;
         assert_eq!(learn_into(&mut store, &found, 2.0, true), found);
         assert!(store.rules[0].active && !store.rules[0].dismissed);
+    }
+
+    #[test]
+    fn an_english_term_replaces_any_spelling_that_sounds_like_the_taught_one() {
+        let rules = vec![pair("深拓", "Zentro"), pair("時辰", "時程")];
+        // A new spelling of the same sound.
+        assert_eq!(
+            apply_by_sound("請用申拓系統處理", &rules),
+            "請用Zentro系統處理"
+        );
+        // Chinese-to-Chinese corrections stay exact: 實誠 is a real word.
+        assert_eq!(apply_by_sound("他很實誠", &rules), "他很實誠");
+        // Nothing that sounds different is touched.
+        assert_eq!(apply_by_sound("請用深度系統", &rules), "請用深度系統");
     }
 
     #[test]
