@@ -904,6 +904,9 @@ impl ShortcutAction for TranscribeAction {
                                 return;
                             }
 
+                            // Yuyin fork: what the recognizer heard, so learning
+                            // can tell its mistakes from the clean-up's.
+                            let heard = converted.clone();
                             // Save to history if WAV was saved
                             if wav_saved {
                                 // Yuyin fork: join the timing record to this entry.
@@ -962,6 +965,7 @@ impl ShortcutAction for TranscribeAction {
                                             &ah_clone,
                                             probe_front,
                                             probe_text,
+                                            heard,
                                         );
                                     }
                                     match result {

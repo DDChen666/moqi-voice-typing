@@ -237,8 +237,9 @@ fn replace_whole(text: &str, from: &str, to: &str) -> String {
 
 // ---------------------------------------------------------------- watching
 
-/// Call right after a successful paste of `pasted` into `front`.
-pub fn after_paste(app: &AppHandle, front: Option<FrontApp>, pasted: String) {
+/// Call right after a successful paste of `pasted` into `front`; `heard` is
+/// the recognizer's text before the clean-up.
+pub fn after_paste(app: &AppHandle, front: Option<FrontApp>, pasted: String, heard: String) {
     if config::get(app).learn_from_edits != Some(true) {
         return;
     }
@@ -253,7 +254,8 @@ pub fn after_paste(app: &AppHandle, front: Option<FrontApp>, pasted: String) {
         let Some(edited) = watch(front.pid, &pasted, generation) else {
             return;
         };
-        let found = corrections(&pasted, &edited);
+        let dictionary = config::get(&app).vocab;
+        let found = learnable(&pasted, &normalize(&heard), &edited, &dictionary);
         debug!(
             "learn: {} correction(s) in {}",
             found.len(),
@@ -455,9 +457,11 @@ fn corrections(pasted: &str, edited: &str) -> Vec<(String, String)> {
     let at: Vec<&str> = a.iter().map(|t| &pasted[t.start..t.end]).collect();
     let bt: Vec<&str> = b.iter().map(|t| &edited[t.start..t.end]).collect();
     let ops = diff(&at, &bt);
-    // Rewritten rather than corrected: more than 40 % of it removed.
+    // Rewritten rather than corrected: more than 40 % of it removed. Not for
+    // a short dictation, where fixing one term is already that much
+    // (打開蘇帕貝斯 -> 打開 Supabase); MAX_TOKENS still bounds each change.
     let removed = ops.iter().filter(|o| matches!(o, Op::Del(_))).count();
-    if removed * 10 > a.len() * 4 {
+    if a.len() >= 10 && removed * 10 > a.len() * 4 {
         return Vec::new();
     }
 
@@ -569,8 +573,14 @@ pub struct Taught {
 
 /// The user corrected `before` (what Moqi typed) into `after` in Moqi's
 /// history: learn the misheard words at once, note the rewordings.
-pub fn teach(app: &AppHandle, before: &str, after: &str) -> Taught {
-    let found = corrections(&normalize(before), &normalize(after));
+pub fn teach(app: &AppHandle, before: &str, heard: &str, after: &str) -> Taught {
+    let dictionary = config::get(app).vocab;
+    let found = learnable(
+        &normalize(before),
+        &normalize(heard),
+        &normalize(after),
+        &dictionary,
+    );
     if found.is_empty() {
         return Taught::default();
     }
@@ -601,6 +611,47 @@ pub fn teach(app: &AppHandle, before: &str, after: &str) -> Taught {
         corrections: active,
         words,
     }
+}
+
+/// The corrections to learn from the user turning `typed` into `edited`,
+/// given what the recognizer `heard` before the clean-up.
+///
+/// A dictionary word is never learned as a mistake: the clean-up sometimes
+/// "corrects" a name it doesn't know into one it does (卡洛普 came out as the
+/// user's Claude), and learning Claude -> Kalopp from the user's fix would
+/// replace every Claude after it. The recognizer's own spelling of that spot
+/// is what was misheard, so when `heard` differs, its corrections are
+/// learned too, but only those that end in a word the user actually wrote
+/// in their fix (so the clean-up's own rewording is never learned).
+fn learnable(
+    typed: &str,
+    heard: &str,
+    edited: &str,
+    dictionary: &[String],
+) -> Vec<(String, String)> {
+    let in_dictionary = |word: &str| {
+        dictionary
+            .iter()
+            .any(|d| d.trim().eq_ignore_ascii_case(word.trim()))
+    };
+    let fixes = corrections(typed, edited);
+    let mut found: Vec<(String, String)> = fixes
+        .iter()
+        .filter(|(from, _)| !in_dictionary(from))
+        .cloned()
+        .collect();
+    if heard.trim() != typed.trim() {
+        for (from, to) in corrections(heard, edited) {
+            let the_users_fix = fixes.iter().any(|(_, fixed)| *fixed == to);
+            if the_users_fix
+                && !in_dictionary(&from)
+                && !found.contains(&(from.clone(), to.clone()))
+            {
+                found.push((from, to));
+            }
+        }
+    }
+    found
 }
 
 /// Worth a dictionary entry: an English term, or two or more Chinese
@@ -840,6 +891,14 @@ mod tests {
     }
 
     #[test]
+    fn a_short_dictation_can_teach_a_term() {
+        assert_eq!(
+            pairs("打開蘇帕貝斯", "打開 Supabase"),
+            vec![pair("蘇帕貝斯", "Supabase")]
+        );
+    }
+
+    #[test]
     fn one_changed_character_keeps_its_neighbour() {
         assert_eq!(
             pairs("這周要交報告", "這週要交報告"),
@@ -996,6 +1055,32 @@ mod tests {
         assert_eq!(apply_by_sound("他很實誠", &rules), "他很實誠");
         // Nothing that sounds different is touched.
         assert_eq!(apply_by_sound("請用深度系統", &rules), "請用深度系統");
+    }
+
+    #[test]
+    fn a_dictionary_word_the_clean_up_put_in_is_not_learned_away() {
+        let dictionary = vec!["Claude".to_string()];
+        // Heard 卡洛普, the clean-up made it Claude, the user wrote Kalopp.
+        assert_eq!(
+            learnable(
+                "請把報告交給 Claude 團隊。",
+                "請把報告交給卡洛普團隊。",
+                "請把報告交給 Kalopp 團隊。",
+                &dictionary
+            ),
+            vec![pair("卡洛普", "Kalopp")]
+        );
+        // The clean-up's own changes (a removed filler, 然後 -> 接著) are not
+        // the user's fix and are not learned from what was heard.
+        assert_eq!(
+            learnable(
+                "接著我們用蘇帕貝斯當後端的資料庫。",
+                "嗯然後我們用蘇帕貝斯當後端的資料庫。",
+                "接著我們用 Supabase 當後端的資料庫。",
+                &[]
+            ),
+            vec![pair("蘇帕貝斯", "Supabase")]
+        );
     }
 
     #[test]

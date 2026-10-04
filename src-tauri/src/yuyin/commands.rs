@@ -81,7 +81,7 @@ pub async fn yuyin_teach(
     if corrected.is_empty() || corrected == before.trim() {
         return Ok(super::learn::Taught::default());
     }
-    let taught = super::learn::teach(&app, &before, &corrected);
+    let taught = super::learn::teach(&app, &before, &entry.transcription_text, &corrected);
     history
         .update_transcription(
             id,
