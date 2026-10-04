@@ -1,4 +1,4 @@
-//! Speech-model warm-up on Windows.
+//! Speech-model warm-up: at launch on Windows, after a rest on both.
 //!
 //! ggml's Vulkan backend builds its GPU pipelines the first time each kernel
 //! runs, and nothing keeps them between launches: on an RTX 4070 the first
@@ -13,16 +13,26 @@
 //! dictation took 4 s for 3 s of audio, the next ones about 0.1 s. So a press
 //! after a long rest warms them again while the user speaks
 //! ([`rewarm_if_idle`]).
+//!
+//! macOS needs that rewarm too, for another reason: under memory pressure it
+//! swaps the idle model out. On a 16 GB MacBook Air the whole 2.2 GB
+//! footprint was in swap four minutes after a dictation, and the first one
+//! after a rest took 5–10 s to transcribe 3–5 s of audio (0.6 s otherwise).
+//! Warming at the press pages the weights back in while the user speaks.
 
 use std::f32::consts::TAU;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime};
 
 use log::{info, warn};
-use tauri::{AppHandle, Manager};
 
+#[cfg(target_os = "windows")]
 use crate::managers::model::ModelManager;
 use crate::managers::transcription::TranscriptionManager;
+#[cfg(target_os = "windows")]
+use std::sync::Arc;
+#[cfg(target_os = "windows")]
+use tauri::{AppHandle, Manager};
 
 /// Load the speech model at launch, which also warms it (see [`start`]).
 /// Handy loads it on the first key press instead; with Vulkan that first
@@ -30,6 +40,7 @@ use crate::managers::transcription::TranscriptionManager;
 /// build. The model stays loaded anyway (Moqi never unloads it), so this
 /// only moves the wait to before the user needs it. Skipped until the model
 /// has been downloaded (first-run onboarding loads it itself).
+#[cfg(target_os = "windows")]
 pub fn preload_at_launch(app: &AppHandle) {
     let selected = crate::settings::get_settings(app).selected_model;
     let downloaded = app
@@ -84,7 +95,13 @@ fn clip(seconds: f32) -> Vec<f32> {
 static LAST_USE: Mutex<Option<SystemTime>> = Mutex::new(None);
 
 /// How long the engine may rest before the next press warms it again.
+#[cfg(not(target_os = "macos"))]
 const IDLE_BEFORE_REWARM: Duration = Duration::from_secs(10 * 60);
+/// Shorter on macOS: swapping starts within minutes. In the user's timing log
+/// (258 dictations) none after a rest under 3 minutes took over 3 s to
+/// transcribe; 5 % after 3–10 minutes did, 21 % after 10–60.
+#[cfg(target_os = "macos")]
+const IDLE_BEFORE_REWARM: Duration = Duration::from_secs(3 * 60);
 
 /// Notes a use and says whether the rest before it was long enough to
 /// rewarm. Unknown or backwards clocks never count as a rest.
@@ -109,6 +126,7 @@ pub fn rewarm_if_idle(manager: &TranscriptionManager) {
 }
 
 /// Run the warm-up in the background; returns at once.
+#[cfg(target_os = "windows")]
 pub fn start(manager: &TranscriptionManager) {
     note_use(SystemTime::now());
     run(manager, &CLIPS);

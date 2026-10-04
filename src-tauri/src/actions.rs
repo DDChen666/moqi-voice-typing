@@ -489,9 +489,9 @@ impl ShortcutAction for TranscribeAction {
         // Load ASR model and VAD model in parallel
         let kickoff_started = Instant::now();
         tm.initiate_model_load();
-        // Yuyin fork: GPU kernels go cold over a long rest; warm them while
-        // the user speaks (see yuyin/warmup.rs).
-        #[cfg(target_os = "windows")]
+        // Yuyin fork: after a rest the model is slow again (cold GPU kernels
+        // on Windows, weights swapped out on macOS); warm it while the user
+        // speaks (see yuyin/warmup.rs).
         crate::yuyin::warmup::rewarm_if_idle(&tm);
         let rm_clone = Arc::clone(&rm);
         std::thread::spawn(move || {

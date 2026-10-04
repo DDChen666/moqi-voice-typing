@@ -35,7 +35,6 @@ pub mod session;
 pub mod snippets;
 pub mod stats;
 pub mod sync;
-#[cfg(target_os = "windows")]
 pub mod warmup;
 #[cfg(target_os = "windows")]
 pub mod window_look;
