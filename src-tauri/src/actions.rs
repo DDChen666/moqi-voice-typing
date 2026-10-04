@@ -877,6 +877,9 @@ impl ShortcutAction for TranscribeAction {
                                         let polished =
                                             crate::yuyin::polish::polish(&ah, &corrected).await;
                                         let polished = crate::yuyin::learn::apply(&ah, &polished);
+                                        // Yuyin fork: dictionary words just heard stay
+                                        // among the recognizer's (yuyin/asr_vocab.rs).
+                                        crate::yuyin::asr_vocab::note_output(&ah, &polished);
                                         if polished != processed.final_text {
                                             processed.post_processed_text = Some(polished.clone());
                                         }

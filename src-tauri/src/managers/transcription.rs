@@ -1251,6 +1251,8 @@ impl TranscriptionManager {
         // with INVALID_ARG, so the whisper extension must be gated on the
         // arch, not on the feature (see #1601).
         let mut model_is_whisper = false;
+        // Yuyin fork: Qwen3-ASR takes the dictionary as recognition vocabulary.
+        let mut model_takes_vocabulary = false;
 
         // Perform transcription with the appropriate engine.
         // We use catch_unwind to prevent engine panics from poisoning the mutex,
@@ -1292,6 +1294,8 @@ impl TranscriptionManager {
                 let caps = model.capabilities();
                 model_takes_initial_prompt = model.supports(Feature::InitialPrompt);
                 model_is_whisper = model.arch() == "whisper";
+                model_takes_vocabulary =
+                    model.arch() == "qwen3_asr" && model.supports(Feature::Vocabulary);
                 model_supports_translate = caps.supports_translate;
                 model_languages = caps.languages;
                 debug!(
@@ -1335,27 +1339,68 @@ impl TranscriptionManager {
                             language: run_plan.language,
                             target_language: run_plan.target_language,
                             family,
+                            // Yuyin fork: dictionary words for the recognizer.
+                            vocabulary: if model_takes_vocabulary {
+                                crate::yuyin::asr_vocab::words(&self.app_handle)
+                            } else {
+                                Vec::new()
+                            },
                             ..Default::default()
                         };
 
                         debug!(
-                            "transcribe-cpp run: task={:?}, language={:?}, initial_prompt={}",
+                            "transcribe-cpp run: task={:?}, language={:?}, initial_prompt={}, vocabulary={}",
                             run_options.task,
                             run_options.language,
-                            run_options.family.is_some()
+                            run_options.family.is_some(),
+                            run_options.vocabulary.len()
                         );
 
-                        session
-                            .run(&audio, &run_options)
-                            .map(|t| {
+                        // Yuyin fork: a dictionary can make Qwen3-ASR loop on its
+                        // words, which transcribe-cpp stops as an error. Never lose
+                        // the dictation to that: run again without the dictionary,
+                        // and failing that keep what was recognized before the loop.
+                        let mut result = session.run(&audio, &run_options);
+                        if let Err(e) = &result {
+                            if !run_options.vocabulary.is_empty() {
+                                warn!("recognition with the dictionary failed ({e}); retrying without it");
+                                let plain = RunOptions {
+                                    vocabulary: Vec::new(),
+                                    ..run_options.clone()
+                                };
+                                result = session.run(&audio, &plain);
+                            }
+                        }
+                        match result {
+                            Ok(t) => {
                                 // Whisper's audio-based LID (auto mode only;
                                 // `None` when a language hint was passed).
                                 model_detected_language = t.language;
-                                t.text
-                            })
-                            .map_err(|e| {
-                                anyhow::anyhow!("transcribe-cpp transcription failed: {}", e)
-                            })
+                                Ok(t.text)
+                            }
+                            // Not on an abort: that is the user cancelling.
+                            Err(e) => match e
+                                .partial()
+                                .filter(|_| {
+                                    matches!(
+                                        e,
+                                        transcribe_cpp::Error::OutputRepetition { .. }
+                                            | transcribe_cpp::Error::OutputTruncated { .. }
+                                    )
+                                })
+                                .map(|t| t.text.clone())
+                                .filter(|text| !text.trim().is_empty())
+                            {
+                                Some(partial) => {
+                                    warn!("recognition stopped early ({e}); keeping the part before it");
+                                    Ok(partial)
+                                }
+                                None => Err(anyhow::anyhow!(
+                                    "transcribe-cpp transcription failed: {}",
+                                    e
+                                )),
+                            },
+                        }
                     }
                     LoadedEngine::Parakeet(parakeet_engine) => {
                         let params = ParakeetParams {

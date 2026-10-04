@@ -16,6 +16,7 @@
 
 pub mod app_menu;
 pub mod apps;
+pub mod asr_vocab;
 pub mod chunker;
 pub mod commands;
 pub mod config;
