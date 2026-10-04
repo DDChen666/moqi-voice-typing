@@ -183,7 +183,11 @@ fn apply_by_sound(text: &str, rules: &[(String, String)]) -> String {
     while i < chars.len() {
         match by_sound.iter().find(|(syl, _)| sounds_like(i, syl)) {
             Some((syl, to)) => {
-                out.push_str(to);
+                out.push_str(&spaced(
+                    out.chars().next_back(),
+                    to,
+                    chars.get(i + syl.len()).copied(),
+                ));
                 i += syl.len();
             }
             None => {
@@ -193,6 +197,19 @@ fn apply_by_sound(text: &str, rules: &[(String, String)]) -> String {
         }
     }
     out
+}
+
+/// `to` with a space on a side where English meets Chinese, the way Moqi
+/// writes mixed text (交給 Kalopp 團隊, not 交給Kalopp團隊).
+fn spaced(before: Option<char>, to: &str, after: Option<char>) -> String {
+    let latin = |c: Option<char>| c.is_some_and(|c| c.is_ascii_alphanumeric());
+    let lead = before.is_some_and(is_han) && latin(to.chars().next());
+    let trail = after.is_some_and(is_han) && latin(to.chars().next_back());
+    format!(
+        "{}{to}{}",
+        if lead { " " } else { "" },
+        if trail { " " } else { "" }
+    )
 }
 
 fn is_han(c: char) -> bool {
@@ -226,7 +243,11 @@ fn replace_whole(text: &str, from: &str, to: &str) -> String {
             || glued(from.chars().next_back(), text[end..].chars().next());
         if !written_out && !inside_word {
             out.push_str(&text[last..at]);
-            out.push_str(to);
+            out.push_str(&spaced(
+                text[..at].chars().next_back(),
+                to,
+                text[end..].chars().next(),
+            ));
             last = end;
         }
         search = end;
@@ -944,6 +965,17 @@ mod tests {
     }
 
     #[test]
+    fn an_english_term_gets_spaces_next_to_chinese() {
+        let rules = vec![pair("卡洛普", "Kalopp")];
+        assert_eq!(
+            apply_rules("請把報告交給卡洛普團隊。", &rules),
+            "請把報告交給 Kalopp 團隊。"
+        );
+        // Already spaced, or next to punctuation: nothing added.
+        assert_eq!(apply_rules("交給 卡洛普。", &rules), "交給 Kalopp。");
+    }
+
+    #[test]
     fn applies_without_breaking_words() {
         let rules = vec![pair("cloud", "Claude"), pair("這周", "這週")];
         assert_eq!(
@@ -1049,7 +1081,7 @@ mod tests {
         // A new spelling of the same sound.
         assert_eq!(
             apply_by_sound("請用申拓系統處理", &rules),
-            "請用Zentro系統處理"
+            "請用 Zentro 系統處理"
         );
         // Chinese-to-Chinese corrections stay exact: 實誠 is a real word.
         assert_eq!(apply_by_sound("他很實誠", &rules), "他很實誠");
