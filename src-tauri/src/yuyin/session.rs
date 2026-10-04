@@ -191,8 +191,8 @@ pub fn begin(app: &AppHandle, pressed: Instant) {
         });
     }
     if cfg.learn_from_edits == Some(true) && !cfg.edit_selection {
-        if let Some(pid) = front_app().map(|f| f.pid) {
-            std::thread::spawn(move || wake_accessibility(pid));
+        if let Some(front) = front_app() {
+            std::thread::spawn(move || wake_accessibility(&front));
         }
     }
     read_selection(app, &cfg, event);
@@ -213,13 +213,14 @@ fn read_selection(app: &AppHandle, cfg: &super::config::YuyinConfig, event: Cont
         debug!("edit by voice: no clean-up service to do it");
         return;
     }
-    let Some(pid) = front_app().map(|f| f.pid) else {
+    let Some(front) = front_app() else {
         return;
     };
+    let pid = front.pid;
     let generation = generation();
     let app = app.clone();
     std::thread::spawn(move || {
-        if wake_accessibility(pid) {
+        if wake_accessibility(&front) {
             std::thread::sleep(Duration::from_millis(300));
         }
         let Some(text) = platform::selected_text(pid).filter(|t| !t.trim().is_empty()) else {
@@ -275,9 +276,10 @@ static WOKEN: Lazy<Mutex<HashSet<i32>>> = Lazy::new(|| Mutex::new(HashSet::new()
 /// Ask `pid` once to expose its text fields (see `platform::wake_accessibility`),
 /// so learning from edits and editing the selection can read them. True if it
 /// was asked just now (its fields take a moment to appear).
-fn wake_accessibility(pid: i32) -> bool {
+fn wake_accessibility(front: &FrontApp) -> bool {
+    let pid = front.pid;
     let first = WOKEN.lock().map(|mut w| w.insert(pid)).unwrap_or(false);
-    let woke = first && platform::wake_accessibility(pid);
+    let woke = first && platform::wake_accessibility(pid, &front.bundle_id);
     if woke {
         debug!("asked app {pid} to expose its text fields");
     }
@@ -674,7 +676,14 @@ mod platform {
     /// on the user's VS Code: the Claude Code input became readable, no
     /// screen-reader prompt appeared, CPU and memory stayed within their
     /// usual range. The app keeps it on until it quits.
-    pub fn wake_accessibility(pid: i32) -> bool {
+    ///
+    /// Chromium browsers ignore that switch and answer to
+    /// `AXEnhancedUserInterface` (what VoiceOver sets) instead; it reports an
+    /// error but takes effect. It is known to upset window managers
+    /// (Rectangle, Magnet), so it is only sent to the browsers. Measured on
+    /// the user's Chrome: a test page's field became readable, CPU and
+    /// memory unchanged.
+    pub fn wake_accessibility(pid: i32, bundle_id: &str) -> bool {
         if focused_element(pid).is_some() {
             return false;
         }
@@ -684,12 +693,18 @@ mod platform {
             return false;
         }
         let app = Owned(app);
-        let Some(attribute) = cf_string("AXManualAccessibility") else {
+        let switch = if super::super::context::is_chromium_browser(bundle_id) {
+            "AXEnhancedUserInterface"
+        } else {
+            "AXManualAccessibility"
+        };
+        let Some(attribute) = cf_string(switch) else {
             return false;
         };
         // SAFETY: app and attribute are live; kCFBooleanTrue is a constant.
         let err = unsafe { AXUIElementSetAttributeValue(app.0, attribute.0, kCFBooleanTrue) };
-        err == 0
+        // Chromium answers kAXErrorAttributeUnsupported yet turns it on.
+        err == 0 || switch == "AXEnhancedUserInterface"
     }
 
     /// The text selected in `pid`'s focused element, to edit by voice. None
@@ -777,7 +792,7 @@ mod platform_tests {
             assert!(selected_text(pid).is_none());
         }
         // Nor is there anything to wake in it.
-        let _ = wake_accessibility(pid);
+        let _ = wake_accessibility(pid, "");
     }
 }
 
@@ -1026,7 +1041,7 @@ mod platform {
     /// Nothing to ask on Windows: Chromium builds its UI Automation tree as
     /// soon as a UIA client reads it. (Not verified on Windows; see the
     /// macOS version.)
-    pub fn wake_accessibility(_pid: i32) -> bool {
+    pub fn wake_accessibility(_pid: i32, _bundle_id: &str) -> bool {
         false
     }
 
@@ -1290,7 +1305,7 @@ mod platform {
         None
     }
 
-    pub fn wake_accessibility(_pid: i32) -> bool {
+    pub fn wake_accessibility(_pid: i32, _bundle_id: &str) -> bool {
         false
     }
 }

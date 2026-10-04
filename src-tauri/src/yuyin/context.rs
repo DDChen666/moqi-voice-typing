@@ -137,6 +137,25 @@ fn web_app(app: &FrontApp) -> Option<(Context, &'static str)> {
 
 /// What the capsule shows for a moment on key press: the web app inside a
 /// browser ("Keep"), otherwise the app's own name ("LINE").
+/// Chromium-based browsers on macOS: they expose their pages to
+/// Accessibility only when asked with `AXEnhancedUserInterface`
+/// (`session::wake_accessibility`).
+const CHROMIUM_BROWSERS: &[&str] = &[
+    "com.google.Chrome",
+    "com.google.Chrome.beta",
+    "com.google.Chrome.canary",
+    "company.thebrowser.Browser", // Arc
+    "com.microsoft.edgemac",
+    "com.brave.Browser",
+    "com.vivaldi.Vivaldi",
+    "com.operasoftware.Opera",
+    "org.chromium.Chromium",
+];
+
+pub fn is_chromium_browser(bundle_id: &str) -> bool {
+    CHROMIUM_BROWSERS.contains(&bundle_id)
+}
+
 pub fn display_name(app: &FrontApp) -> String {
     match web_app(app) {
         Some((_, name)) => name.to_string(),
@@ -230,6 +249,15 @@ mod tests {
             style_key(&app("jp.naver.line.mac", "")),
             "jp.naver.line.mac"
         );
+    }
+
+    #[test]
+    fn chromium_browsers_but_not_safari_or_electron_apps() {
+        assert!(is_chromium_browser("com.google.Chrome"));
+        assert!(is_chromium_browser("company.thebrowser.Browser"));
+        assert!(!is_chromium_browser("com.apple.Safari"));
+        assert!(!is_chromium_browser("org.mozilla.firefox"));
+        assert!(!is_chromium_browser("com.microsoft.VSCode"));
     }
 
     #[test]
