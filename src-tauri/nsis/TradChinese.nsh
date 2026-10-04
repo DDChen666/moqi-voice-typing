@@ -1,0 +1,23 @@
+; Yuyin fork: the installer's Traditional Chinese strings in Taiwan wording
+; (資料 rather than 數據, 結束 rather than 終止). Same keys as Tauri's own
+; TradChinese.nsh; set in tauri.windows.conf.json (customLanguageFiles).
+LangString addOrReinstall ${LANG_TRADCHINESE} "新增或重新安裝元件"
+LangString alreadyInstalled ${LANG_TRADCHINESE} "已經安裝"
+LangString alreadyInstalledLong ${LANG_TRADCHINESE} "這台電腦已經安裝 ${PRODUCTNAME} ${VERSION}。選擇你要做的事，再按「下一步」。"
+LangString appRunning ${LANG_TRADCHINESE} "${PRODUCTNAME} 正在執行。請先結束它再試一次。"
+LangString appRunningOkKill ${LANG_TRADCHINESE} "${PRODUCTNAME} 正在執行。$\n按「確定」結束它。"
+LangString chooseMaintenanceOption ${LANG_TRADCHINESE} "選擇要進行的維護方式。"
+LangString choowHowToInstall ${LANG_TRADCHINESE} "選擇要怎麼安裝 ${PRODUCTNAME}。"
+LangString createDesktop ${LANG_TRADCHINESE} "在桌面建立捷徑"
+LangString dontUninstall ${LANG_TRADCHINESE} "不要解除安裝"
+LangString dontUninstallDowngrade ${LANG_TRADCHINESE} "不要解除安裝（這個安裝程式不能在未解除安裝的情況下安裝舊版）"
+LangString failedToKillApp ${LANG_TRADCHINESE} "無法結束 ${PRODUCTNAME}。請先自己結束它再試一次。"
+LangString newerVersionInstalled ${LANG_TRADCHINESE} "這台電腦已經安裝較新版本的 ${PRODUCTNAME}，不建議安裝舊版。如果確定要安裝舊版，最好先解除安裝目前的版本。選擇你要做的事，再按「下一步」。"
+LangString older ${LANG_TRADCHINESE} "較舊"
+LangString olderOrUnknownVersionInstalled ${LANG_TRADCHINESE} "這台電腦已經安裝了$R4版本的 ${PRODUCTNAME}。建議先解除安裝目前的版本再安裝。選擇你要做的事，再按「下一步」。"
+LangString silentDowngrades ${LANG_TRADCHINESE} "這個安裝程式不能在背景安裝舊版，請改用一般的安裝畫面。$\n"
+LangString unableToUninstall ${LANG_TRADCHINESE} "無法解除安裝！"
+LangString uninstallApp ${LANG_TRADCHINESE} "解除安裝 ${PRODUCTNAME}"
+LangString uninstallBeforeInstalling ${LANG_TRADCHINESE} "先解除安裝再安裝"
+LangString unknown ${LANG_TRADCHINESE} "未知"
+LangString deleteAppData ${LANG_TRADCHINESE} "一併刪除設定、歷史紀錄和錄音"

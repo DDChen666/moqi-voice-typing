@@ -82,7 +82,9 @@ export const PolishStep: React.FC<{
   );
 
   const saveKey = async () => {
-    if (key.trim()) await yuyinApi.setApiKey(key.trim());
+    // This step offers DeepSeek only, so the key is DeepSeek's.
+    if (key.trim())
+      await yuyinApi.setApiKey(key.trim(), "https://api.deepseek.com");
   };
 
   const test = async () => {

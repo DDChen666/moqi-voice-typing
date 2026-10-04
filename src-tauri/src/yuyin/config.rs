@@ -32,8 +32,12 @@ pub enum Level {
 pub enum Service {
     /// DeepSeek flash with reasoning off, the M0 pick.
     Deepseek,
+    /// OpenRouter: one key for many providers' models, picked in settings.
+    Openrouter,
     /// Any OpenAI-compatible endpoint at `base_url` / `model`.
     Custom,
+    /// A model on this computer (Ollama, LM Studio): no key, nothing leaves.
+    Local,
     /// Nothing leaves the machine: every level behaves like 原話.
     None,
 }
@@ -50,6 +54,18 @@ pub struct YuyinConfig {
     pub model: String,
     /// After this, paste the raw transcript instead of waiting.
     pub timeout_ms: u64,
+    /// Learn from the user's corrections after a paste (learn.rs). `None`:
+    /// not asked yet; off until the user says yes (docs/隱私.md).
+    pub learn_from_edits: Option<bool>,
+    /// Voice snippets: say the trigger, get the text (snippets.rs).
+    pub snippets: Vec<super::snippets::Snippet>,
+    /// Per-app styles (apps.rs).
+    pub app_styles: Vec<super::apps::AppStyle>,
+    /// Write every dictation in this language ("en", "ja"…); `None`: as spoken.
+    pub translate_to: Option<String>,
+    /// With text selected, what the user says edits it (polish.rs). Off by
+    /// default: the selected text is then sent to the clean-up service too.
+    pub edit_selection: bool,
 }
 
 impl Default for YuyinConfig {
@@ -62,6 +78,11 @@ impl Default for YuyinConfig {
             // M0: flash with reasoning off is 0.8 s median; v4-pro is slower and worse.
             model: "deepseek-flash".into(),
             timeout_ms: 5_000,
+            learn_from_edits: None,
+            snippets: Vec::new(),
+            app_styles: Vec::new(),
+            translate_to: None,
+            edit_selection: false,
         }
     }
 }

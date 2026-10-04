@@ -80,6 +80,27 @@
 :root[data-platform="macos"] body {
   background-color: transparent;
 }
+/* Windows 11 gets Mica the same way: lib.rs makes the window transparent,
+   applies Mica and sets `data-mica`. Without Mica (Windows 10, or Mica
+   failed) the window stays opaque and the sidebar gets a solid tint, so it
+   still reads as a separate column. */
+:root[data-mica],
+:root[data-mica] body {
+  background-color: transparent;
+}
+:root[data-platform="windows"]:not([data-mica]) .moqi-sidebar {
+  background-color: color-mix(
+    in srgb,
+    var(--color-text) 4%,
+    var(--color-background)
+  );
+}
+/* Windows' fonts set Chinese a little wider than PingFang, so paragraphs
+   sized for the Mac could end on a lone "腦。" or "籤。"; balance the last
+   line instead. */
+:root[data-platform="windows"] {
+  text-wrap-style: pretty;
+}
 body {
   -webkit-user-select: none;
   user-select: none;

@@ -6,11 +6,13 @@
 <br>
 
 <p align="center">
-  <a href="https://github.com/DDChen666/moqi-voice-typing/releases/latest"><img src="docs/media/download-en.png" width="300" alt="Download for macOS"></a>
+  <a href="https://github.com/DDChen666/moqi-voice-typing/releases/tag/v1.0.0"><img src="docs/media/download-en.png" width="300" alt="Download for macOS"></a>
+  <a href="https://github.com/DDChen666/moqi-voice-typing/releases/latest"><img src="docs/media/download-windows-en.png" width="300" alt="Download for Windows"></a>
 </p>
 
 <p align="center">
-  <a href="docs/安裝教學-Mac.md"><b>Install guide</b></a> &nbsp;·&nbsp;
+  <a href="docs/安裝教學-Mac.md"><b>Install guide (Mac)</b></a> &nbsp;·&nbsp;
+  <a href="docs/安裝教學-Windows.md"><b>Install guide (Windows)</b></a> &nbsp;·&nbsp;
   <a href="docs/使用指南.md"><b>Usage</b></a> &nbsp;·&nbsp;
   <a href="docs/隱私.md"><b>Privacy</b></a> &nbsp;·&nbsp;
   <a href="docs/評測.md"><b>Benchmarks</b></a> &nbsp;·&nbsp;
@@ -19,9 +21,10 @@
 </p>
 
 <p align="center">
-  <img alt="Version 1.0.0" src="https://img.shields.io/badge/version-1.0.0-0a84ff?style=flat-square">
+  <img alt="Version: Windows 1.1.0, Mac 1.0.0" src="https://img.shields.io/badge/version-Windows%201.1.0%20%C2%B7%20Mac%201.0.0-0a84ff?style=flat-square">
   <img alt="macOS 15+" src="https://img.shields.io/badge/macOS-15%2B-1d1d1f?style=flat-square&logo=apple&logoColor=white">
   <img alt="Apple silicon" src="https://img.shields.io/badge/Apple-silicon-1d1d1f?style=flat-square">
+  <img alt="Windows 10 and 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?style=flat-square">
   <img alt="Voice stays on device" src="https://img.shields.io/badge/voice-on--device-34c759?style=flat-square">
   <img alt="MIT" src="https://img.shields.io/badge/license-MIT-8e8e93?style=flat-square">
 </p>
@@ -32,7 +35,7 @@ https://github.com/user-attachments/assets/d8b08c03-3a8e-45ee-86c3-d20c30ad6946
 
 <br>
 
-Hold the right Option key, speak, let go — the text appears at your cursor. Moqi is built for people who **switch between Mandarin and English mid-sentence**. Speech is recognized entirely on your Mac; sending the text to an AI for clean-up is up to you.
+Hold the right Option key (right Alt on Windows), speak, let go — the text appears at your cursor. Moqi is built for people who **switch between Mandarin and English mid-sentence**. Speech is recognized entirely on your computer; sending the text to an AI for clean-up is up to you.
 
 <br>
 
@@ -56,7 +59,7 @@ Hold the right Option key, speak, let go — the text appears at your cursor. Mo
 
 <img src="docs/media/feature-privacy.png" width="100%" alt="Recognition stays on your Mac; the privacy card shows 0 seconds of audio uploaded">
 
-**Your voice never leaves your computer.** No account, no analytics, no auto-update. The API key lives in the macOS Keychain. In Raw mode, not even text is sent.
+**Your voice never leaves your computer.** No account, no analytics. Updates ask before installing, and the check can be turned off. The API key lives in the macOS Keychain or the Windows Credential Manager. In Raw mode, not even text is sent.
 
 <br>
 
@@ -68,11 +71,21 @@ Hold the right Option key, speak, let go — the text appears at your cursor. Mo
 
 ## Get started
 
-1. [Download](https://github.com/DDChen666/moqi-voice-typing/releases/latest) `Moqi_1.0.0_aarch64.dmg` and drag Moqi into Applications.
+**Mac**
+
+1. [Download](https://github.com/DDChen666/moqi-voice-typing/releases/tag/v1.0.0) `Moqi_1.0.0_aarch64.dmg` and drag Moqi into Applications. The Mac is on 1.0.0 for now; 1.1.0's new features follow in a later Mac build.
 2. The first launch is blocked because Moqi isn't signed with a paid Apple Developer ID. Open **System Settings → Privacy & Security** and click **Open Anyway**. If macOS says the app "is damaged", run `xattr -dr com.apple.quarantine /Applications/Moqi.app` in Terminal.
 3. Follow the three setup steps: allow permissions, choose Raw or Tidy, and try a sentence.
 
-Requires an M1 or later Mac with macOS 15 or later. The interface is available in Traditional Chinese and English.
+Requires an M1 or later Mac with macOS 15 or later.
+
+**Windows**
+
+1. [Download](https://github.com/DDChen666/moqi-voice-typing/releases/latest) `Moqi_1.1.0_x64-setup.exe` and open it.
+2. Windows shows a blue "Windows protected your PC" screen because Moqi has no paid code-signing certificate: click **More info**, then **Run anyway**.
+3. Follow the installer, then the three setup steps.
+
+Requires Windows 10 or 11 (64-bit); a dedicated graphics card is recommended. The interface is available in Traditional Chinese and English.
 
 |                        | What it does                                                    | Needs                                                                                     |
 | ---------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
@@ -80,13 +93,13 @@ Requires an M1 or later Mac with macOS 15 or later. The interface is available i
 | **Tidy** (recommended) | Removes fillers and false starts, turns spoken lists into lists | An API key for the clean-up service (DeepSeek by default; any OpenAI-compatible endpoint) |
 | **Polish**             | Rewrites into written prose                                     | Same                                                                                      |
 
-Hold right ⌥ Option to dictate, double-tap for hands-free, Esc to cancel.
+Hold right ⌥ Option (right Alt on Windows) to dictate, double-tap for hands-free, Esc to cancel.
 
 ## Roadmap
 
-- [ ] **Learns your words** — fix a word once and Moqi gets it right next time. Recognition-side vocabulary is done on the `v1.1` branch (English terms correct 71% → 87%).
-- [ ] **Windows**
-- [ ] **On-device clean-up** with a small local language model, so not even text leaves your computer.
+- [ ] **Learns your words** — fix a word once and Moqi gets it right next time. In 1.1.0, "learn from corrections" picks up a fix you make twice; recognition-side vocabulary is on the `v1.1` branch, not in a release yet (English terms correct 71% → 87%).
+- [x] **Windows** (1.1.0)
+- [x] **On-device clean-up** with a small local language model, so not even text leaves your computer (1.1.0, through Ollama or LM Studio).
 - [ ] **Learns your typing habits** (spaces vs. line breaks, punctuation), off by default.
 
 ## Contributing

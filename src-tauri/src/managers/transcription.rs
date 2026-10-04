@@ -469,7 +469,12 @@ impl TranscriptionManager {
     }
 
     pub fn load_model(&self, model_id: &str) -> Result<()> {
-        self.load_model_with_device(model_id, None)
+        self.load_model_with_device(model_id, None)?;
+        // Yuyin fork: build the GPU kernels now rather than on the user's
+        // first dictation (Vulkan on Windows; see yuyin/warmup.rs).
+        #[cfg(target_os = "windows")]
+        crate::yuyin::warmup::start(self);
+        Ok(())
     }
 
     /// Like [`load_model`](Self::load_model), but lets a caller hard-select the

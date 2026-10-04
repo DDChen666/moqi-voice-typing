@@ -44,8 +44,13 @@ const CHAT_APPS: &[&str] = &[
     "messenger.exe",
     "telegram.exe",
     "whatsapp.exe",
+    "whatsapp.root.exe", // the 2024+ WhatsApp app
     "discord.exe",
+    "discordptb.exe",
+    "discordcanary.exe",
     "slack.exe",
+    "ms-teams.exe", // Teams sends on Enter like the others
+    "teams.exe",    // classic Teams
 ];
 
 const AI_APPS: &[&str] = &[
@@ -62,11 +67,19 @@ const AI_APPS: &[&str] = &[
     "claude.exe",
     "chatgpt.exe",
     "windowsterminal.exe",
+    "openconsole.exe",
+    "conhost.exe",
     "cmd.exe",
     "powershell.exe",
     "pwsh.exe",
     "wezterm-gui.exe",
+    "alacritty.exe",
+    "mintty.exe", // Git Bash, MSYS2, Cygwin
+    "warp.exe",
+    "tabby.exe",
+    "hyper.exe",
     "code.exe",
+    "code - insiders.exe",
     "cursor.exe",
 ];
 
@@ -76,6 +89,8 @@ const NOTES_APPS: &[&str] = &[
     // Windows
     "obsidian.exe",
     "onenote.exe",
+    "onenoteim.exe",       // OneNote for Windows 10 (Store)
+    "microsoft.notes.exe", // Sticky Notes
 ];
 
 const BROWSERS: &[&str] = &[
@@ -91,6 +106,8 @@ const BROWSERS: &[&str] = &[
     "firefox.exe",
     "brave.exe",
     "arc.exe",
+    "vivaldi.exe",
+    "opera.exe",
 ];
 
 /// Web apps are identified by the tab title that browsers put in the window
@@ -125,6 +142,34 @@ pub fn display_name(app: &FrontApp) -> String {
         Some((_, name)) => name.to_string(),
         None => app.name.clone(),
     }
+}
+
+/// What a per-app style is saved under (apps.rs): the app, or for a web app
+/// the browser and the site ("com.google.Chrome#Facebook"). The settings list
+/// names that row "Facebook"; keyed by the browser alone, a choice made for it
+/// changed every other tab too.
+pub fn style_key(app: &FrontApp) -> String {
+    match web_app(app) {
+        Some((_, site)) => format!("{}#{site}", app.bundle_id),
+        None => app.bundle_id.clone(),
+    }
+}
+
+/// Password and permission prompts the system puts in front (the Keychain
+/// password sheet, UAC): not somewhere to dictate, so not an app to list.
+pub fn is_system_prompt(app: &FrontApp) -> bool {
+    const PROMPTS: &[&str] = &[
+        "com.apple.SecurityAgent",
+        "com.apple.loginwindow",
+        "com.apple.coreservices.uiagent",
+        "com.apple.UserNotificationCenter",
+        // Windows
+        "consent.exe",
+        "credentialuibroker.exe",
+        "logonui.exe",
+        "lockapp.exe",
+    ];
+    PROMPTS.contains(&app.bundle_id.as_str())
 }
 
 pub fn classify(app: &FrontApp) -> Context {
@@ -176,6 +221,25 @@ mod tests {
     }
 
     #[test]
+    fn a_site_gets_its_own_style_not_the_whole_browser() {
+        let facebook = app("com.google.Chrome", "Facebook - Google Chrome");
+        let other = app("com.google.Chrome", "Hacker News - Google Chrome");
+        assert_eq!(style_key(&facebook), "com.google.Chrome#Facebook");
+        assert_eq!(style_key(&other), "com.google.Chrome");
+        assert_eq!(
+            style_key(&app("jp.naver.line.mac", "")),
+            "jp.naver.line.mac"
+        );
+    }
+
+    #[test]
+    fn system_prompts_are_not_apps() {
+        assert!(is_system_prompt(&app("com.apple.SecurityAgent", "")));
+        assert!(is_system_prompt(&app("consent.exe", "")));
+        assert!(!is_system_prompt(&app("com.apple.Notes", "")));
+    }
+
+    #[test]
     fn native_apps() {
         assert_eq!(classify(&app("jp.naver.line.mac", "")), Context::Chat);
         assert_eq!(classify(&app("com.openai.chat", "")), Context::ToAi);
@@ -213,6 +277,39 @@ mod tests {
             Context::ToAi
         );
         assert_eq!(classify(&app("notepad.exe", "")), Context::Other);
+    }
+
+    #[test]
+    fn windows_apps_and_titles() {
+        for chat in ["whatsapp.root.exe", "discord.exe", "ms-teams.exe"] {
+            assert_eq!(classify(&app(chat, "")), Context::Chat, "{chat}");
+        }
+        for ai in [
+            "mintty.exe",
+            "pwsh.exe",
+            "code.exe",
+            "cursor.exe",
+            "claude.exe",
+        ] {
+            assert_eq!(classify(&app(ai, "")), Context::ToAi, "{ai}");
+        }
+        assert_eq!(classify(&app("onenoteim.exe", "")), Context::Notes);
+        // Edge puts the profile and the other tabs in the title.
+        assert_eq!(
+            classify(&app(
+                "msedge.exe",
+                "Messenger 和另外 3 個頁面 - 個人 - Microsoft​ Edge"
+            )),
+            Context::Chat
+        );
+        assert_eq!(
+            classify(&app("chrome.exe", "Google Keep - Google Chrome")),
+            Context::Notes
+        );
+        assert_eq!(
+            display_name(&app("chrome.exe", "Claude - Google Chrome")),
+            "Claude"
+        );
     }
 
     #[test]

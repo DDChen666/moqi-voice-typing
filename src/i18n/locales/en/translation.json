@@ -749,7 +749,10 @@
       "fallback": "Clean-up didn't finish — pasted the raw text",
       "handsFree": "Hands-free · press to finish",
       "sendsTo": "Text → {{to}}",
-      "allLocal": "All local"
+      "allLocal": "All local",
+      "editSelection": "Editing the selection",
+      "editing": "Editing",
+      "translating": "Translating"
     }
   },
   "secureInput": {
@@ -816,9 +819,11 @@
       "seconds": "s",
       "minutes": "min",
       "hours": "h",
-      "chars": "chars",
+      "chars_one": "char",
+      "chars_other": "chars",
       "charsPerMinute": "chars/min",
-      "days": "days",
+      "days_one": "day",
+      "days_other": "days",
       "secondsValue": "{{value}} s",
       "timesValue": "{{value}}"
     },
@@ -830,7 +835,7 @@
     "home": {
       "slogan": "Let Moqi do the typing",
       "insights": "Insights",
-      "computedLocally": "All computed on this computer",
+      "computedLocally": "Stats computed on this computer",
       "chars": "Characters dictated",
       "saved": "Time saved",
       "speed": "Speaking speed",
@@ -852,8 +857,8 @@
       "audioUploaded": "Audio uploaded",
       "appNamesSent": "App names, window titles sent",
       "textSent": "Text sent for clean-up",
-      "sentNote": "Only the recognized text and your dictionary words go to {{to}}. Your voice never leaves this computer.",
-      "nothingSent": "So far, nothing has left this computer.",
+      "sentNote": "Only the recognized text, your dictionary words, and the text you selected when editing by voice go to {{to}}. Your voice never leaves this computer.",
+      "nothingSent": "So far, nothing you said has left this computer.",
       "seeWhatWasSent": "See what was sent each time",
       "savedHint": "Compared with typing 40 characters a minute"
     },
@@ -879,7 +884,8 @@
       "nothingSent": "Nothing was sent. Everything stayed on this computer.",
       "sent": "Sent",
       "notSent": "Kept",
-      "sentText": "{{count}} characters of recognized text → {{to}}",
+      "sentText_one": "{{count}} character of recognized text → {{to}}",
+      "sentText_other": "{{count}} characters of recognized text → {{to}}",
       "audio": "Audio",
       "dictionary": "Your dictionary words (so the clean-up keeps your spelling)",
       "appAndTitle": "App name, window title (only “style: {{style}}” was sent)",
@@ -895,13 +901,97 @@
       "chat": "chat",
       "to_ai": "to AI",
       "notes": "notes",
-      "other": "general"
+      "other": "general",
+      "groupTitle": "Language and per-app styles",
+      "translateAll": "Translate to",
+      "asSpoken": "As spoken",
+      "followGlobal": "Follow the setting above",
+      "translatesTo": "Translates to {{language}}",
+      "auto": "Automatic ({{style}})",
+      "style": "Style",
+      "language": "Language",
+      "note": "Extra request",
+      "notePlaceholder": "e.g. keep it polite, shorter sentences",
+      "adjust": "Adjust",
+      "done": "Done",
+      "empty": "Apps you dictate into show up here, each with its own style and language.",
+      "footnote": "Translation and extra requests need a clean-up service (not “None”); when translating, even “As spoken” dictations are sent to be translated."
+    },
+    "sync": {
+      "groupTitle": "Sync between computers",
+      "folder": "Sync folder",
+      "notSet": "Not set",
+      "choose": "Choose folder…",
+      "chooseTitle": "Choose a folder in your cloud drive",
+      "stop": "Stop syncing",
+      "status": "Sync status",
+      "lastSync": "Last synced {{time}}",
+      "never": "Not synced yet",
+      "devices_one": "{{count}} other computer: {{names}}",
+      "devices_other": "{{count}} other computers: {{names}}",
+      "noDevices": "No other computer yet — choose the same folder in Moqi on another computer",
+      "syncNow": "Sync now",
+      "syncing": "Syncing…",
+      "failed": "Sync failed: {{error}}",
+      "footnote": "Choose a folder in OneDrive, Dropbox, Google Drive or iCloud Drive, and the same folder on your other computer. Your dictionary, learned corrections and clean-up settings sync; API keys, recordings and history don't, and each computer decides on “Learn from my corrections” itself."
+    },
+    "snippets": {
+      "title": "Voice snippets",
+      "hint": "Say exactly the phrase, get the text below",
+      "empty": "No snippets yet. For example: say “my email” to paste your email address.",
+      "triggerPlaceholder": "What you say, e.g. my email",
+      "textPlaceholder": "What gets pasted",
+      "add": "Add snippet",
+      "remove": "Remove"
+    },
+    "editSelection": {
+      "title": "Edit selected text by voice",
+      "description": "Select some text, hold the talk key and say “make it more formal” or “translate to English”; say new text to replace it instead. The selected text is sent to the clean-up service too."
+    },
+    "languages": {
+      "en": "English",
+      "ja": "日本語",
+      "ko": "한국어",
+      "zh-Hans": "Simplified Chinese"
+    },
+    "update": {
+      "title": "Check for updates",
+      "description": "Every 6 hours Moqi asks GitHub for a newer version; it downloads only the version file.",
+      "checkNow": "Check now",
+      "checking": "Checking…",
+      "latest": "You have the latest version",
+      "failed": "No version information found. Try again later.",
+      "available": "Version {{version}} is out — click to update",
+      "availableShort": "Version {{version}} is available",
+      "install": "Update and restart",
+      "installing": "Updating… {{percent}}%",
+      "retry": "Update didn't finish — click to retry",
+      "installFailed": "The update didn't finish (download interrupted or the file failed verification); this version keeps working"
+    },
+    "learn": {
+      "settingsGroup": "Learning",
+      "title": "Learn from my corrections",
+      "description": "When you correct a word Moqi typed and make the same correction twice, Moqi writes it your way from then on.",
+      "privacy": "Compared on this computer only. Only the corrected words are kept (e.g. “Supabsee → Supabase”), never the whole text, and nothing is sent. Password boxes are never read. Turned off, Moqi learns nothing new; manage what it learned on the Dictionary page.",
+      "askTitle": "Let Moqi learn from your corrections?",
+      "askBody": "When you correct a word Moqi typed (say “Supabsee” to “Supabase”), Moqi remembers it on this computer and applies it once you've made the same correction twice. Only the corrected words are kept, never the whole text, and nothing is sent. You can change this in Settings.",
+      "askYes": "Turn on",
+      "askNo": "Not now",
+      "learnedTitle": "Learned corrections",
+      "learnedHint": "Removed ones are never learned again",
+      "applied": "Applied automatically",
+      "seenOnce": "Corrected once; once more and it's applied",
+      "applyNow": "Apply now",
+      "remove": "Remove",
+      "emptyOn": "Nothing yet. Correct a word Moqi typed and it shows up here.",
+      "emptyOff": "Turn on “Learn from my corrections” in Settings, and the words you correct will show up here."
     },
     "dictionary": {
       "subtitle": "Names, products and terms Moqi mishears. Clean-up spells them exactly like this, capitals included.",
       "placeholder": "Add a word, e.g. Typeless",
       "add": "Add",
-      "count": "{{count}} words",
+      "count_one": "{{count}} word",
+      "count_other": "{{count}} words",
       "removeHint": "× to remove",
       "remove": "Remove {{word}}",
       "saveFailed": "Couldn't save the dictionary. Try again."
@@ -922,7 +1012,15 @@
       "serviceDeepseek": "DeepSeek (recommended)",
       "serviceCustom": "Another OpenAI-compatible service",
       "serviceNone": "None (all local)",
-      "serviceNote": "Only the recognized text and your dictionary words are sent. Which app you're in is judged on this computer; only a label like “style: chat” goes out.",
+      "serviceOpenrouter": "OpenRouter (choose a model)",
+      "serviceLocal": "A model on this computer (Ollama, LM Studio)",
+      "serviceNoteLocalModel": "Text only goes to a model on this computer: nothing leaves it, and no key is needed. Speed depends on your computer; the first clean-up waits for the model to load.",
+      "localRefresh": "Refresh",
+      "localNotFound": "No model server found on this computer. Install and open Ollama, then download a model (for example, run ollama pull gemma4:e2b in a terminal).",
+      "localNoModels": "Ollama has no models yet. Download one (for example, run ollama pull gemma4:e2b in a terminal).",
+      "localGetOllama": "Get Ollama",
+      "serviceNote": "Only the recognized text, your dictionary words, and the text you selected when editing by voice are sent. Which app you're in is judged on this computer; only a label like “style: chat” goes out.",
+      "serviceNoteOpenrouter": "OpenRouter passes the text to the company behind the model you pick (for example DeepSeek, Google or OpenAI). Only the recognized text, your dictionary words, and the text you selected when editing by voice are sent; which app you're in is judged on this computer.",
       "serviceNoteLocal": "All local: offline, no key needed. The level stays at “As spoken”.",
       "apiKey": "API key",
       "save": "Save",
@@ -937,6 +1035,25 @@
       "keySaved": "Key saved to the keychain",
       "endpoint": "URL and model",
       "modelName": "Model",
+      "model": "Model",
+      "otherModel": "Other model…",
+      "searchModels": "Search models, e.g. gemini, qwen",
+      "modelsLoading": "Loading OpenRouter's models…",
+      "modelsFailed": "Couldn't load the model list. Check your connection and try again.",
+      "modelFree": "Free (may queue, slower)",
+      "costPerThousand": "about US${{cost}} per 1,000 dictations",
+      "getKey": "Get a key from {{service}}",
+      "testResultTimed": "Result ({{seconds}} s): {{text}}",
+      "rawSkipsLocal": "The local model is set up, but “As spoken” never uses it: what you say isn't cleaned up.",
+      "rawSkips": "{{service}} is set up, but “As spoken” never uses it: what you say isn't sent for clean-up.",
+      "useTidy": "Switch to Tidy",
+      "openrouterNotes": {
+        "deepseek": "Recommended: cheapest, strong Chinese",
+        "gemini": "Fast",
+        "luna": "Inexpensive",
+        "haiku": "High quality, pricier",
+        "qwen": "Strong Chinese, inexpensive"
+      },
       "microphone": "Microphone",
       "sound": "Start sound",
       "soundHint": "Start speaking after the chime so the first word isn't cut",
@@ -976,6 +1093,71 @@
       "tryDone": "It works!",
       "tryPlaceholder": "Hold {{key}}, say something, let go — it appears here",
       "tryIdeas": "Try mixing languages, or correcting yourself mid-sentence"
+    }
+  },
+  "windows": {
+    "onboarding": {
+      "permissions": {
+        "intro": "Hold the right Alt key and speak. Let go, and the text appears at your cursor.\nFirst, a few things to set up."
+      },
+      "ready": {
+        "slogan": "Hold the right Alt key and let Moqi do the typing."
+      }
+    },
+    "settings": {
+      "general": {
+        "shortcut": {
+          "description": "Right Alt by default. Click the key to change it.",
+          "bindings": {
+            "transcribe": {
+              "description": "Right Alt by default. Click the key to change it."
+            }
+          }
+        }
+      },
+      "advanced": {
+        "showTrayIcon": {
+          "description": "Display the Moqi icon in the system tray."
+        }
+      },
+      "debug": {
+        "keyboardDiagnostic": {
+          "running": "Listening… press your shortcut a few times (e.g. Alt+Space)"
+        }
+      },
+      "about": {
+        "acknowledgments": {
+          "ggml": {
+            "details": "The inference engine that runs speech recognition on this computer (on the graphics card through Vulkan on Windows). Thanks to Georgi Gerganov and all contributors."
+          }
+        }
+      }
+    },
+    "accessibility": {
+      "openSettings": "Open Settings"
+    },
+    "errors": {
+      "micPermissionDenied": {
+        "windows": "Open Settings → Privacy & security → Microphone and turn on “Microphone access” and “Let desktop apps access your microphone”."
+      }
+    },
+    "yuyin": {
+      "apiKey": {
+        "description": "DeepSeek by default. Stored in Windows Credential Manager, never in a file.",
+        "statusSet": "✓ Key saved in Credential Manager"
+      }
+    },
+    "moqi": {
+      "history": {
+        "empty": "Nothing yet. Hold the right Alt key and say something."
+      },
+      "settings": {
+        "keyStored": "In Credential Manager",
+        "keySaved": "Key saved to Credential Manager"
+      },
+      "onboarding": {
+        "keyNote": "Stored in this computer's Windows Credential Manager, never in a file. No key yet?"
+      }
     }
   }
 }

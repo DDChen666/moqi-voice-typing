@@ -1,6 +1,6 @@
 [package]
 name = "handy"
-version = "1.0.0"
+version = "1.1.0"
 description = "Handy"
 authors = ["cjpais"]
 edition = "2021"
@@ -125,6 +125,10 @@ windows = { version = "0.61.3", features = [
   "Win32_Foundation",
   "Win32_Graphics_Gdi",
   "Win32_UI_WindowsAndMessaging",
+  # Yuyin fork: executable descriptions for the foreground app's name, and
+  # following foreground changes for the tray's "paste last".
+  "Win32_Storage_FileSystem",
+  "Win32_UI_Accessibility",
 ] }
 winreg = "0.55"
 
@@ -193,6 +197,10 @@ transcribe-cpp = { version = "0.2.4", default-features = false, features = [
 [patch.crates-io]
 tao = { git = "https://github.com/cjpais/tao", rev = "c3bee28c1d446d95f08c95c3b6f8d4bde052b876" }
 tao-macros = { git = "https://github.com/cjpais/tao", rev = "c3bee28c1d446d95f08c95c3b6f8d4bde052b876" }
+# Yuyin fork: handy-keys 0.3.4 plus one Windows fix — holding a modifier-only
+# talk key (right Alt) let its auto-repeat reach the focused app, which then
+# moved focus to its menu and the paste missed. See vendor/handy-keys/Cargo.toml.
+handy-keys = { path = "vendor/handy-keys" }
 
 [dev-dependencies]
 tempfile = "3"

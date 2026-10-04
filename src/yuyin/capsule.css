@@ -28,6 +28,9 @@
     BlinkMacSystemFont,
     "SF Pro Text",
     "PingFang TC",
+    "Segoe UI Variable Text",
+    "Segoe UI",
+    "Microsoft JhengHei UI",
     sans-serif;
   letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
@@ -143,23 +146,11 @@
   opacity: 0;
 }
 
+/* Drawn on a canvas in whole device pixels (Capsule.tsx): 2 px hairline bars
+   that stay crisp on a 1× display too. Dim while silent, bright on voice. */
 .yy-wave {
-  display: flex;
-  align-items: center;
-  gap: 2.5px;
-  height: 20px;
-  flex: none;
-}
-.yy-wave i {
   display: block;
-  width: 2px;
-  height: 2px;
-  border-radius: 1px;
-  background: rgba(245, 245, 247, 0.35);
-  transition: background 0.4s;
-}
-.yy-cap.voiced .yy-wave i {
-  background: rgba(245, 245, 247, 0.95);
+  flex: none;
 }
 
 .yy-ctx {
@@ -172,6 +163,15 @@
 .yy-ctx svg {
   width: 13px;
   height: 13px;
+}
+/* App names and custom service hosts can be long (Windows names apps by
+   their file description): cut them rather than let the pill outgrow its
+   window (256 px, 340 on Windows), which clipped both ends and hid the name. */
+.yy-clip {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 /* Transparency: where the text goes while tidying, or that nothing left. */
 .yy-dest {

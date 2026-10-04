@@ -1,0 +1,13 @@
+# Yuyin fork: read C/C++ sources as UTF-8 on Windows.
+#
+# MSVC reads a source file without a BOM in the system code page. On Windows
+# set to Chinese (Taiwan) that is Big5 (950): a UTF-8 character in a comment
+# of transcribe.cpp (src/arch/canary/model.cpp) then swallows the line break
+# and the build fails with C2065 'sp_space_id'. The `cc` and `cmake` crates
+# pass these target-specific variables to the compiler, so this only affects
+# Windows builds; macOS never sees the flag.
+[env]
+CFLAGS_x86_64_pc_windows_msvc = "/utf-8"
+CXXFLAGS_x86_64_pc_windows_msvc = "/utf-8"
+CFLAGS_aarch64_pc_windows_msvc = "/utf-8"
+CXXFLAGS_aarch64_pc_windows_msvc = "/utf-8"

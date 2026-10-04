@@ -156,6 +156,16 @@ const AccessibilityOnboarding: React.FC<AccessibilityOnboardingProps> = ({
         return;
       }
 
+      // Yuyin fork: Windows needs no permission for the keyboard hook or for
+      // pasting, so start them now, as macOS does once Accessibility is on.
+      // Step 3 (試說一句) needs the talk key before onboarding is "done".
+      Promise.all([
+        commands.initializeEnigo(),
+        commands.initializeShortcuts(),
+      ]).catch((e) => {
+        console.warn("Failed to initialize shortcuts:", e);
+      });
+
       try {
         const microphoneGranted = await hasWindowsMicrophoneAccess();
 

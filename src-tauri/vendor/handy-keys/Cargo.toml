@@ -1,0 +1,51 @@
+# Yuyin fork: handy-keys 0.3.4 from crates.io (MIT, see LICENSE), vendored
+# for one Windows fix: a held modifier-only hotkey's auto-repeat used to reach
+# the focused app (see `blocks_modifier_event` in
+# src/platform/windows/listener.rs). Wired in through [patch.crates-io] in
+# ../../Cargo.toml. Drop this copy once upstream ships the fix.
+[package]
+name = "handy-keys"
+version = "0.3.4"
+edition = "2021"
+description = "Cross-platform global keyboard shortcuts library"
+license = "MIT"
+repository = "https://github.com/handy-computer/handy-keys"
+publish = false
+
+[lib]
+name = "handy_keys"
+path = "src/lib.rs"
+
+[dependencies]
+bitflags = { version = "2", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-core-foundation = "0.3"
+objc2-core-graphics = { version = "0.3", features = ["CGEvent", "CGEventTypes", "CGEventSource", "CGRemoteOperation"] }
+objc2-app-kit = { version = "0.3", features = ["NSEvent", "NSApplication"] }
+objc2-foundation = "0.3"
+block2 = "0.6"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_System_RemoteDesktop",
+    "Win32_Graphics_Gdi",
+] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+evdev = "0.13"
+libc = "0.2"
+
+[target.'cfg(target_os = "windows")'.dev-dependencies]
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_System_Console",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_System_Threading",
+] }

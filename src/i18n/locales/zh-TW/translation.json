@@ -746,7 +746,10 @@
       "fallback": "潤稿沒有完成，已貼上原文",
       "handsFree": "免持・再按一下結束",
       "sendsTo": "文字 → {{to}}",
-      "allLocal": "全程本機"
+      "allLocal": "全程本機",
+      "editSelection": "改寫選取的文字",
+      "editing": "改寫中",
+      "translating": "翻譯中"
     }
   },
   "whatsNew": {
@@ -816,9 +819,11 @@
       "seconds": "秒",
       "minutes": "分",
       "hours": "小時",
-      "chars": "字",
+      "chars_one": "字",
+      "chars_other": "字",
       "charsPerMinute": "字／分",
-      "days": "天",
+      "days_one": "天",
+      "days_other": "天",
       "secondsValue": "{{value}} 秒",
       "timesValue": "{{value}} 次"
     },
@@ -830,7 +835,7 @@
     "home": {
       "slogan": "讓默契幫你打字",
       "insights": "洞察",
-      "computedLocally": "全部在這台電腦上計算",
+      "computedLocally": "這些統計在這台電腦上計算",
       "chars": "口述字數",
       "saved": "省下的時間",
       "speed": "說話速度",
@@ -852,8 +857,8 @@
       "audioUploaded": "上傳的聲音",
       "appNamesSent": "送出 App 名稱、視窗標題",
       "textSent": "送去潤稿的文字",
-      "sentNote": "送到 {{to}} 的只有辨識出的文字和你字典裡的詞。聲音從頭到尾留在這台電腦。",
-      "nothingSent": "到目前為止，什麼都沒有離開這台電腦。",
+      "sentNote": "送到 {{to}} 的只有辨識出的文字、你字典裡的詞，以及你用說的修改時選取的文字。聲音從頭到尾留在這台電腦。",
+      "nothingSent": "到目前為止，你說的話都沒有離開這台電腦。",
       "seeWhatWasSent": "看每一次送出了什麼",
       "savedHint": "和每分鐘打 40 字相比，說話省下的時間"
     },
@@ -879,7 +884,8 @@
       "nothingSent": "什麼都沒有送出，全程在這台電腦上處理。",
       "sent": "送出",
       "notSent": "沒送",
-      "sentText": "辨識出的文字 {{count}} 字 → {{to}}",
+      "sentText_one": "辨識出的文字 {{count}} 字 → {{to}}",
+      "sentText_other": "辨識出的文字 {{count}} 字 → {{to}}",
       "audio": "聲音",
       "dictionary": "字典裡的詞（讓潤稿照你的寫法）",
       "appAndTitle": "App 名稱、視窗標題（只送出「風格：{{style}}」）",
@@ -895,13 +901,97 @@
       "chat": "聊天",
       "to_ai": "給 AI",
       "notes": "筆記",
-      "other": "一般"
+      "other": "一般",
+      "groupTitle": "語言與各 App 的風格",
+      "translateAll": "翻譯成",
+      "asSpoken": "照說的語言",
+      "followGlobal": "跟隨上面的設定",
+      "translatesTo": "翻譯成{{language}}",
+      "auto": "自動（{{style}}）",
+      "style": "風格",
+      "language": "語言",
+      "note": "額外要求",
+      "notePlaceholder": "例如：用敬語、句子短一點",
+      "adjust": "調整",
+      "done": "完成",
+      "empty": "用默契打過字的 App 會列在這裡，可以分別設定風格和語言。",
+      "footnote": "翻譯和額外要求要用潤稿服務才會生效（選「不使用」時不會）；翻譯時，原話也會先送去翻譯。"
+    },
+    "sync": {
+      "groupTitle": "在電腦之間同步",
+      "folder": "同步資料夾",
+      "notSet": "還沒設定",
+      "choose": "選擇資料夾…",
+      "chooseTitle": "選一個雲端硬碟裡的資料夾",
+      "stop": "停止同步",
+      "status": "同步狀態",
+      "lastSync": "上次同步 {{time}}",
+      "never": "還沒同步過",
+      "devices_one": "另外 {{count}} 台電腦：{{names}}",
+      "devices_other": "另外 {{count}} 台電腦：{{names}}",
+      "noDevices": "還沒有其他電腦，請在另一台電腦的默契選同一個資料夾",
+      "syncNow": "立即同步",
+      "syncing": "同步中…",
+      "failed": "同步失敗：{{error}}",
+      "footnote": "選 OneDrive、Dropbox、Google Drive 或 iCloud 雲端硬碟裡的一個資料夾，在另一台電腦也選同一個。會同步字典、學到的改法和潤稿設定；API key、錄音和歷史紀錄不會同步，「從我的修改學習」也由每台電腦各自決定。"
+    },
+    "snippets": {
+      "title": "語音片語",
+      "hint": "整句話剛好是這幾個字，就貼上下面的內容",
+      "empty": "還沒有片語。例如：說「我的信箱」，就貼上你的 email。",
+      "triggerPlaceholder": "要說的話，例如：我的信箱",
+      "textPlaceholder": "要貼上的內容",
+      "add": "加入片語",
+      "remove": "刪除"
+    },
+    "editSelection": {
+      "title": "選取文字時，用說的修改它",
+      "description": "選取一段字，按住說話鍵說「改正式一點」「翻成英文」就改好；直接說新內容則會取代它。選取的文字會一起送給潤稿服務。"
+    },
+    "languages": {
+      "en": "English",
+      "ja": "日本語",
+      "ko": "한국어",
+      "zh-Hans": "簡體中文"
+    },
+    "update": {
+      "title": "自動檢查更新",
+      "description": "每 6 小時到 GitHub 看一次有沒有新版本，只下載版本資訊。",
+      "checkNow": "立即檢查",
+      "checking": "檢查中…",
+      "latest": "已經是最新版本",
+      "failed": "沒有找到版本資訊，請稍後再試",
+      "available": "有新版本 {{version}}，點這裡更新",
+      "availableShort": "有新版本 {{version}}",
+      "install": "更新並重新開啟",
+      "installing": "正在更新… {{percent}}%",
+      "retry": "更新沒有完成，點這裡重試",
+      "installFailed": "更新沒有完成（下載中斷或檔案驗證失敗），舊版本照常可用"
+    },
+    "learn": {
+      "settingsGroup": "學習",
+      "title": "從我的修改學習",
+      "description": "你在輸入框裡改正默契打的字，同樣的改法出現兩次後，之後就自動照你的改。",
+      "privacy": "只在這台電腦上比對，只保存改過的詞（例如「蘇帕貝斯 → Supabase」），不保存整段文字，也不會送出。密碼欄不會讀。關掉後就不再學新的；已經學到的改法在「字典」頁管理。",
+      "askTitle": "讓默契從你的修改學習？",
+      "askBody": "你在輸入框裡改正默契打的字（例如把「蘇帕貝斯」改成「Supabase」），默契會在這台電腦上記住，同樣的改法出現兩次後自動套用。只保存改過的詞，不保存整段文字，也不會送出。之後可以在設定裡改。",
+      "askYes": "開啟",
+      "askNo": "先不要",
+      "learnedTitle": "學到的改法",
+      "learnedHint": "刪除後就不會再學這個",
+      "applied": "已自動套用",
+      "seenOnce": "改過 1 次，再改 1 次就會自動套用",
+      "applyNow": "現在套用",
+      "remove": "刪除",
+      "emptyOn": "還沒有學到。你在輸入框裡改正默契打的字，就會出現在這裡。",
+      "emptyOff": "在「設定」開啟「從我的修改學習」後，你改正默契打的字會列在這裡。"
     },
     "dictionary": {
       "subtitle": "默契常聽錯的名字、產品、術語，加在這裡。整理文字時會照這裡的寫法，英文大小寫也一樣。",
       "placeholder": "新增一個詞，例如 Typeless",
       "add": "加入",
-      "count": "{{count}} 個詞",
+      "count_one": "{{count}} 個詞",
+      "count_other": "{{count}} 個詞",
       "removeHint": "按 × 移除",
       "remove": "移除 {{word}}",
       "saveFailed": "字典沒有存成功，請再試一次"
@@ -922,7 +1012,15 @@
       "serviceDeepseek": "DeepSeek（推薦）",
       "serviceCustom": "其他相容 OpenAI 格式的服務",
       "serviceNone": "不使用（全程本機）",
-      "serviceNote": "送出的只有辨識出的文字和你字典裡的詞。你在哪個 App 打字只在這台電腦上判斷，送出去的只有「風格：聊天」這類標籤。",
+      "serviceOpenrouter": "OpenRouter（可選模型）",
+      "serviceLocal": "本機模型（Ollama、LM Studio）",
+      "serviceNoteLocalModel": "文字只送到這台電腦上的模型，不會離開這台電腦，也不需要 key。速度取決於你的電腦；第一次整理要等模型載入，可能比較久。",
+      "localRefresh": "重新整理",
+      "localNotFound": "找不到這台電腦上的模型服務。請先安裝並開啟 Ollama，再下載一個模型（例如在終端機輸入 ollama pull gemma4:e2b）。",
+      "localNoModels": "Ollama 還沒有模型，請先下載一個（例如在終端機輸入 ollama pull gemma4:e2b）。",
+      "localGetOllama": "下載 Ollama",
+      "serviceNote": "送出的只有辨識出的文字、你字典裡的詞，以及你用說的修改時選取的文字。你在哪個 App 打字只在這台電腦上判斷，送出去的只有「風格：聊天」這類標籤。",
+      "serviceNoteOpenrouter": "OpenRouter 會把文字轉給你選的模型的公司處理（例如 DeepSeek、Google、OpenAI）。送出的只有辨識出的文字、你字典裡的詞，以及你用說的修改時選取的文字；你在哪個 App 打字只在這台電腦上判斷。",
       "serviceNoteLocal": "全程本機：不連網，也不需要 key。潤飾程度固定為「原話」。",
       "apiKey": "API key",
       "save": "儲存",
@@ -937,6 +1035,25 @@
       "keySaved": "key 已存進鑰匙圈",
       "endpoint": "網址與模型",
       "modelName": "模型名稱",
+      "model": "模型",
+      "otherModel": "其他模型…",
+      "searchModels": "搜尋模型，例如 gemini、qwen",
+      "modelsLoading": "正在載入 OpenRouter 的模型清單…",
+      "modelsFailed": "載入不了模型清單，請確認網路後再試。",
+      "modelFree": "免費（可能要排隊，比較慢）",
+      "costPerThousand": "約 US${{cost}}／千句",
+      "getKey": "到 {{service}} 申請 key",
+      "testResultTimed": "整理結果（{{seconds}} 秒）：{{text}}",
+      "rawSkipsLocal": "你已經設定好本機模型，但「原話」不會用到它：說的話不會經過整理。",
+      "rawSkips": "你已經設定好 {{service}}，但「原話」不會用到它：說的話不會送去整理。",
+      "useTidy": "改用「整理」",
+      "openrouterNotes": {
+        "deepseek": "推薦：最便宜，中文好",
+        "gemini": "速度快",
+        "luna": "便宜",
+        "haiku": "品質好，比較貴",
+        "qwen": "中文好、便宜"
+      },
       "microphone": "麥克風",
       "sound": "提示音",
       "soundHint": "聽到「叮」再開口，第一個字不會被吃掉",
@@ -976,6 +1093,71 @@
       "tryDone": "成功了！",
       "tryPlaceholder": "按住 {{key}} 說一句話，放開，字就會出現在這裡",
       "tryIdeas": "試試看：中英夾雜說一句，或講錯改口「禮拜三，不對，禮拜四」"
+    }
+  },
+  "windows": {
+    "onboarding": {
+      "permissions": {
+        "intro": "按住右邊的 Alt 鍵說話，放開，字就出現在游標上。\n開始之前，需要準備幾件事。"
+      },
+      "ready": {
+        "slogan": "按住右邊的 Alt 鍵，讓默契幫你打字。"
+      }
+    },
+    "settings": {
+      "general": {
+        "shortcut": {
+          "description": "預設是右邊的 Alt 鍵。點右邊的按鍵可以換成別的鍵。",
+          "bindings": {
+            "transcribe": {
+              "description": "預設是右邊的 Alt 鍵。點右邊的按鍵可以換成別的鍵。"
+            }
+          }
+        }
+      },
+      "advanced": {
+        "showTrayIcon": {
+          "description": "在系統匣顯示「默契」的圖示"
+        }
+      },
+      "debug": {
+        "keyboardDiagnostic": {
+          "running": "正在監聽… 請按幾次您的快捷鍵（例如 Alt+Space）"
+        }
+      },
+      "about": {
+        "acknowledgments": {
+          "ggml": {
+            "details": "在這台電腦上跑語音辨識模型的推理引擎（Windows 版透過 Vulkan 用顯示卡）。感謝 Georgi Gerganov 和所有貢獻者。"
+          }
+        }
+      }
+    },
+    "accessibility": {
+      "openSettings": "開啟設定"
+    },
+    "errors": {
+      "micPermissionDenied": {
+        "windows": "到「設定」→「隱私權與安全性」→「麥克風」，打開「麥克風存取」和「允許傳統型應用程式存取您的麥克風」。"
+      }
+    },
+    "yuyin": {
+      "apiKey": {
+        "description": "預設用 DeepSeek。key 存在 Windows 認證管理員，不會寫進任何檔案。",
+        "statusSet": "✓ key 已存在 Windows 認證管理員"
+      }
+    },
+    "moqi": {
+      "history": {
+        "empty": "還沒有紀錄。按住右邊的 Alt 鍵說一句話試試。"
+      },
+      "settings": {
+        "keyStored": "已存在認證管理員",
+        "keySaved": "key 已存進 Windows 認證管理員"
+      },
+      "onboarding": {
+        "keyNote": "key 存在這台電腦的 Windows 認證管理員，不會寫進任何檔案。還沒有 key？"
+      }
     }
   }
 }

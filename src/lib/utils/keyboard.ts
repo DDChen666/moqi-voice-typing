@@ -208,10 +208,16 @@ const formatKeyPart = (part: string): string => {
  */
 export const formatKeyCombination = (
   combination: string,
-  _osType: OSType,
+  osType: OSType,
 ): string => {
   if (!combination) return "";
-  const label = combination.split("+").map(formatKeyPart).join(" + ");
+  // Yuyin fork: "option" is the Mac name of the key Windows keyboards print
+  // as Alt (both parse to the same modifier), so show it as Alt off the Mac.
+  const keys =
+    osType === "macos"
+      ? combination
+      : combination.replace(/\boption(?=_|\+|$)/g, "alt");
+  const label = keys.split("+").map(formatKeyPart).join(" + ");
   // Yuyin fork: key sides in Chinese ("右 Option"); key names stay as printed.
   return i18next.language?.startsWith("zh")
     ? label.replace(/\bRight /g, "右 ").replace(/\bLeft /g, "左 ")

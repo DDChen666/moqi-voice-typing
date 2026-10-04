@@ -6,11 +6,13 @@
 <br>
 
 <p align="center">
-  <a href="https://github.com/DDChen666/moqi-voice-typing/releases/latest"><img src="docs/media/download.png" width="300" alt="下載 macOS 版"></a>
+  <a href="https://github.com/DDChen666/moqi-voice-typing/releases/tag/v1.0.0"><img src="docs/media/download.png" width="300" alt="下載 macOS 版"></a>
+  <a href="https://github.com/DDChen666/moqi-voice-typing/releases/latest"><img src="docs/media/download-windows.png" width="300" alt="下載 Windows 版"></a>
 </p>
 
 <p align="center">
-  <a href="docs/安裝教學-Mac.md"><b>安裝教學</b></a> &nbsp;·&nbsp;
+  <a href="docs/安裝教學-Mac.md"><b>安裝教學（Mac）</b></a> &nbsp;·&nbsp;
+  <a href="docs/安裝教學-Windows.md"><b>安裝教學（Windows）</b></a> &nbsp;·&nbsp;
   <a href="docs/使用指南.md"><b>使用指南</b></a> &nbsp;·&nbsp;
   <a href="docs/隱私.md"><b>隱私</b></a> &nbsp;·&nbsp;
   <a href="docs/評測.md"><b>評測</b></a> &nbsp;·&nbsp;
@@ -19,9 +21,10 @@
 </p>
 
 <p align="center">
-  <img alt="版本 1.0.0" src="https://img.shields.io/badge/%E7%89%88%E6%9C%AC-1.0.0-0a84ff?style=flat-square">
+  <img alt="版本：Windows 1.1.0、Mac 1.0.0" src="https://img.shields.io/badge/%E7%89%88%E6%9C%AC-Windows%201.1.0%20%C2%B7%20Mac%201.0.0-0a84ff?style=flat-square">
   <img alt="macOS 15+" src="https://img.shields.io/badge/macOS-15%2B-1d1d1f?style=flat-square&logo=apple&logoColor=white">
   <img alt="Apple 晶片" src="https://img.shields.io/badge/Apple-%E6%99%B6%E7%89%87-1d1d1f?style=flat-square">
+  <img alt="Windows 10、11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?style=flat-square">
   <img alt="本機辨識" src="https://img.shields.io/badge/%E8%81%B2%E9%9F%B3-%E4%B8%8D%E4%B8%8A%E5%82%B3-34c759?style=flat-square">
   <img alt="MIT" src="https://img.shields.io/badge/%E6%8E%88%E6%AC%8A-MIT-8e8e93?style=flat-square">
 </p>
@@ -32,7 +35,7 @@ https://github.com/user-attachments/assets/d8b08c03-3a8e-45ee-86c3-d20c30ad6946
 
 <br>
 
-按住右 Option 說話，放開，字就出現在游標上。默契專為**中英夾雜**的說話方式設計，辨識全程在你的 Mac 上完成；要不要再交給 AI 整理，由你決定。
+按住右 Option（Windows 是右 Alt）說話，放開，字就出現在游標上。默契專為**中英夾雜**的說話方式設計，辨識全程在你的電腦上完成；要不要再交給 AI 整理，由你決定。
 
 <br>
 
@@ -56,7 +59,7 @@ https://github.com/user-attachments/assets/d8b08c03-3a8e-45ee-86c3-d20c30ad6946
 
 <img src="docs/media/feature-privacy.png" width="100%" alt="辨識，全程在本機；隱私卡片顯示上傳的聲音 0 秒">
 
-**聲音不離開你的電腦。** 沒有帳號、沒有追蹤、不會自動更新。API key 存在 macOS 鑰匙圈。選「原話」時，連文字都不會送出。
+**聲音不離開你的電腦。** 沒有帳號、沒有追蹤。有新版本時會先問你，不會自己安裝，也可以關掉檢查。API key 存在 macOS 鑰匙圈或 Windows 認證管理員。選「原話」時，連文字都不會送出。
 
 <br>
 
@@ -68,11 +71,21 @@ https://github.com/user-attachments/assets/d8b08c03-3a8e-45ee-86c3-d20c30ad6946
 
 ## 開始使用
 
-1. [下載](https://github.com/DDChen666/moqi-voice-typing/releases/latest) `Moqi_1.0.0_aarch64.dmg`，把「默契」拖進「應用程式」。
+**Mac**
+
+1. [下載](https://github.com/DDChen666/moqi-voice-typing/releases/tag/v1.0.0) `Moqi_1.0.0_aarch64.dmg`，把「默契」拖進「應用程式」。Mac 版目前是 1.0.0，1.1.0 的新功能之後會跟上。
 2. 第一次打開會被 macOS 擋下：默契是免費開源軟體，沒有付費取得 Apple 簽章。到「系統設定」→「隱私權與安全性」，按「**強制打開**」。
 3. 跟著畫面完成三步：允許權限、選「原話」或「整理」、試說一句。
 
 需要 M1 以後的 Mac、macOS 15 以後。遇到「已損毀」等狀況，見 [安裝教學](docs/安裝教學-Mac.md)。
+
+**Windows**
+
+1. [下載](https://github.com/DDChen666/moqi-voice-typing/releases/latest) `Moqi_1.1.0_x64-setup.exe`，打開它。
+2. 出現藍色的「Windows 已保護您的電腦」：默契沒有購買程式碼簽章憑證。按「**其他資訊**」→「**仍要執行**」。
+3. 跟著安裝精靈按「下一步」，裝好後跟著畫面完成三步。
+
+需要 Windows 10 或 11（64 位元），建議有獨立顯示卡。圖文說明見 [安裝教學](docs/安裝教學-Windows.md)。
 
 |                  | 做什麼                                     | 需要                                |
 | ---------------- | ------------------------------------------ | ----------------------------------- |
@@ -80,13 +93,13 @@ https://github.com/user-attachments/assets/d8b08c03-3a8e-45ee-86c3-d20c30ad6946
 | **整理**（推薦） | 去贅字、改口只留最後的說法、口頭列點變清單 | 潤稿服務的 API key（預設 DeepSeek） |
 | **潤飾**         | 重組句子，讀起來像寫的                     | 同上                                |
 
-按住右 ⌥ Option 說話；快按兩下進入免持；Esc 取消。更多操作見 [使用指南](docs/使用指南.md)。
+按住右 ⌥ Option（Windows 是右 Alt）說話；快按兩下進入免持；Esc 取消。更多操作見 [使用指南](docs/使用指南.md)。
 
 ## 接下來
 
-- [ ] **自動學詞**：你改過一次的字，默契下次就寫對。辨識端的字典已在 `v1.1` 分支完成，英文詞寫對從 71% 提升到 87%。
-- [ ] **Windows 版**
-- [ ] **本機整理**：用小型語言模型在電腦上整理，連文字都不送出。
+- [ ] **自動學詞**：你改過一次的字，默契下次就寫對。1.1.0 的「從修改學習」同樣的改法出現兩次就會記住；辨識端的字典在 `v1.1` 分支，還沒放進正式版（英文詞寫對從 71% 提升到 87%）。
+- [x] **Windows 版**（1.1.0）
+- [x] **本機整理**：用小型語言模型在電腦上整理，連文字都不送出（1.1.0，接 Ollama、LM Studio）。
 - [ ] **學你的打字習慣**：空格還是換行、標點習慣，預設關閉。
 
 ## 參與

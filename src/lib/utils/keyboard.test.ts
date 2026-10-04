@@ -24,4 +24,10 @@ assert.equal(
   "audiovolumeup",
 );
 
+// Yuyin fork: the Mac's Option key is Alt on Windows keyboards.
+assert.equal(formatKeyCombination("option_right", "windows"), "Right Alt");
+assert.equal(formatKeyCombination("alt_right", "windows"), "Right Alt");
+assert.equal(formatKeyCombination("option_right", "macos"), "Right Option");
+assert.equal(formatKeyCombination("option+space", "windows"), "Alt + Space");
+
 console.log("keyboard: all assertions passed");

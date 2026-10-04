@@ -106,3 +106,16 @@
   --color-fill: var(--dark-color-fill);
   --color-positive: var(--dark-color-positive);
 }
+
+/*
+ * Yuyin fork: Windows UI fonts. Without them Chromium uses plain Segoe UI and
+ * picks the Chinese fallback from the page language, which can land on the
+ * Simplified-style Microsoft YaHei. macOS keeps Tailwind's system stack
+ * (SF Pro + PingFang). `data-platform` is set in main.tsx.
+ */
+:root[data-platform="windows"] {
+  --font-sans:
+    "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI",
+    "Microsoft JhengHei UI", "Microsoft JhengHei", sans-serif, "Segoe UI Emoji",
+    "Segoe UI Symbol";
+}

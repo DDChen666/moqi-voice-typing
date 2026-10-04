@@ -5,6 +5,11 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { getVersion } from "@tauri-apps/api/app";
+import {
+  installUpdate,
+  useAutomaticUpdateChecks,
+  useUpdateState,
+} from "../update";
 import AccessibilityPermissions from "@/components/AccessibilityPermissions";
 import SecureInputWarning from "@/components/SecureInputWarning";
 import {
@@ -67,6 +72,10 @@ export const MoqiWindow: React.FC<{
     scrollRef.current?.scrollTo({ top: 0 });
   }, [page]);
 
+  // New versions: checked at launch and every six hours, unless turned off.
+  useAutomaticUpdateChecks(settings?.update_checks_enabled ?? false);
+  const update = useUpdateState();
+
   const debug = settings?.debug_mode ?? false;
   useEffect(() => {
     if (!debug && page === "debug") setPage("home");
@@ -74,7 +83,7 @@ export const MoqiWindow: React.FC<{
 
   return (
     <div dir={i18n.dir()} className="h-screen flex select-none cursor-default">
-      <aside className="w-[200px] shrink-0 h-full flex flex-col border-e border-hairline px-2.5 pb-3.5">
+      <aside className="moqi-sidebar w-[200px] shrink-0 h-full flex flex-col border-e border-hairline px-2.5 pb-3.5">
         <div
           data-tauri-drag-region
           className={`${macTitleBar ? "h-[52px]" : "h-5"} shrink-0`}
@@ -120,6 +129,22 @@ export const MoqiWindow: React.FC<{
           active={page === "settings"}
           onClick={() => setPage("settings")}
         />
+        {(update.kind === "available" ||
+          update.kind === "installing" ||
+          update.kind === "installFailed") && (
+          <button
+            type="button"
+            onClick={installUpdate}
+            disabled={update.kind === "installing"}
+            className="mx-1 mt-2 px-2.5 py-1.5 rounded-[8px] text-start text-[12px] font-medium bg-logo-primary text-white hover:brightness-110 disabled:opacity-80"
+          >
+            {update.kind === "installing"
+              ? t("moqi.update.installing", { percent: update.percent })
+              : update.kind === "installFailed"
+                ? t("moqi.update.retry")
+                : t("moqi.update.available", { version: update.version })}
+          </button>
+        )}
         {version && (
           <div className="px-2.5 pt-2 text-[11px] text-muted">
             {t("settings.about.versionLabel", { version })}

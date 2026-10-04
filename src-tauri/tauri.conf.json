@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Moqi",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "identifier": "tw.yuyin.dictation",
   "build": {
     "beforeDevCommand": "bun run dev",
@@ -80,8 +80,13 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEJBQjcyMDk1MjA2NjAxRjkKUldUNUFXWWdsU0MzdXRRZi8zYzhqV2FaNUVDbDd2Rk5VM1IvWWowVXdmRFNKQ1BrMXF5RFFsLy8K",
-      "endpoints": []
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDUzMzVFNUI0NzVGQzc0QTcKUldTbmRQeDF0T1UxVTlnT1R2VUYxczh5QXpnUGFDWlFuUnp6eDJsOExQaE9XMmRhT2c4N1pMOVMK",
+      "endpoints": [
+        "https://github.com/DDChen666/moqi-voice-typing/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
     }
   }
 }

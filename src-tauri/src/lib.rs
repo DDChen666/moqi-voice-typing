@@ -696,6 +696,14 @@ pub fn run(cli_args: CliArgs) {
             yuyin::commands::yuyin_has_api_key,
             yuyin::commands::yuyin_set_api_key,
             yuyin::commands::yuyin_test_polish,
+            yuyin::commands::yuyin_openrouter_models,
+            yuyin::commands::yuyin_learned,
+            yuyin::commands::yuyin_set_learned,
+            yuyin::commands::yuyin_sync_status,
+            yuyin::commands::yuyin_set_sync_folder,
+            yuyin::commands::yuyin_sync_now,
+            yuyin::commands::yuyin_local_models,
+            yuyin::commands::yuyin_recent_apps,
             yuyin::commands::yuyin_report_error,
             yuyin::commands::yuyin_stats,
             yuyin::commands::yuyin_history_meta,
@@ -1020,6 +1028,12 @@ pub fn run(cli_args: CliArgs) {
                         color: None,
                     });
             }
+            // Yuyin fork: on Windows, a size that follows the system text size,
+            // and Mica on Windows 11 (yuyin/window_look.rs).
+            #[cfg(target_os = "windows")]
+            {
+                win_builder = yuyin::window_look::apply(app.handle(), win_builder);
+            }
 
             if let Some(data_dir) = portable::data_dir() {
                 win_builder = win_builder.data_directory(data_dir.join("webview"));
@@ -1060,7 +1074,7 @@ pub fn run(cli_args: CliArgs) {
             yuyin::app_menu::apply(app.handle());
             // Yuyin fork: any keychain prompt for the API key shows now, not
             // mid-dictation.
-            yuyin::secrets::warm();
+            yuyin::secrets::warm(yuyin::polish::key_host(&yuyin::config::get(app.handle())));
 
             let mut settings = get_settings(app.handle());
 
@@ -1089,6 +1103,17 @@ pub fn run(cli_args: CliArgs) {
             app.manage(TranscriptionCoordinator::new(app_handle.clone()));
 
             initialize_core_logic(&app_handle);
+            // Yuyin fork: load and warm the model now on Windows, so the first
+            // dictation after a restart isn't the slow one (yuyin/warmup.rs).
+            #[cfg(target_os = "windows")]
+            yuyin::warmup::preload_at_launch(&app_handle);
+            // Yuyin fork: remember the user's window for the tray's "paste
+            // last" (yuyin/focus_return.rs). Setup runs on the main thread.
+            #[cfg(target_os = "windows")]
+            yuyin::focus_return::install();
+            // Yuyin fork: sync the dictionary and settings through the user's
+            // cloud folder, when they picked one (yuyin/sync.rs).
+            yuyin::sync::start(&app_handle);
 
             // Secure Input monitor (macOS): detects stuck secure input that
             // silently blocks keyed shortcuts, warns the user, and activates

@@ -8,6 +8,7 @@ import {
   updateDocumentDirection,
   updateDocumentLanguage,
 } from "@/lib/utils/rtl";
+import { applyPlatformCopy } from "@/yuyin/platformCopy"; // Yuyin fork
 
 // Auto-discover translation files using Vite's glob import
 const localeModules = import.meta.glob<{ default: Record<string, unknown> }>(
@@ -23,6 +24,8 @@ for (const [path, module] of Object.entries(localeModules)) {
     resources[langCode] = { translation: module.default };
   }
 }
+// Yuyin fork: Windows wording ("右 Alt", 認證管理員, 系統匣) over the Mac copy.
+applyPlatformCopy(resources);
 
 // Build supported languages list from discovered locales + metadata
 export const SUPPORTED_LANGUAGES = Object.keys(resources)

@@ -84,6 +84,78 @@ pub fn user_message(transcript: &str) -> String {
     format!("<transcript>\n{transcript}\n</transcript>")
 }
 
+/// The language names the prompt uses for an output language code.
+pub fn language_name(code: &str) -> Option<&'static str> {
+    Some(match code {
+        "en" => "英文（English）",
+        "ja" => "日文（日本語）",
+        "ko" => "韓文（한국어）",
+        "zh-Hans" => "簡體中文",
+        "zh-Hant" => "繁體中文（台灣用語）",
+        _ => return None,
+    })
+}
+
+/// What the user asked for in one app (Settings > per-app styles): an extra
+/// instruction, and a language to write in. Added after the evaluated prompt
+/// only when set, so the default prompt stays exactly as measured.
+fn with_requests(prompt: String, note: &str, translate_to: Option<&str>) -> String {
+    let mut prompt = prompt;
+    let note = note.trim();
+    if !note.is_empty() {
+        prompt.push_str(&format!("\n\n## 使用者的額外要求\n{note}"));
+    }
+    if let Some(language) = translate_to.and_then(language_name) {
+        prompt.push_str(&format!(
+            "\n\n## 輸出語言\n處理完後，把內容翻譯成{language}再輸出，只輸出翻譯後的文字。產品名、人名、程式碼、檔名、網址維持原樣。"
+        ));
+    }
+    prompt
+}
+
+/// `system_prompt` plus the user's requests for this app.
+pub fn system_prompt_for(
+    level: Level,
+    context: Context,
+    vocab: &[String],
+    note: &str,
+    translate_to: Option<&str>,
+) -> Option<String> {
+    system_prompt(level, context, vocab).map(|p| with_requests(p, note, translate_to))
+}
+
+// Not part of the M0 evaluation: editing selected text by voice.
+const EDIT: &str = "你是文字編輯助手。<selected> 裡是使用者在 App 裡選取的一段文字，<said> 裡是他接著用語音說的話（語音辨識的結果，可能有同音錯字）。
+
+先判斷 <said> 是哪一種：
+1. 對選取文字的修改要求（例如「改正式一點」「翻成英文」「縮短一點」「把星期三改成星期四」「改成條列」）：照要求修改選取的文字，輸出修改後的完整文字。
+2. 要取代選取文字的新內容（使用者直接口述了一段新的文字）：輸出整理後的這段新內容，去掉贅字、修正同音錯字。
+
+規則：
+- 只輸出結果本身，不加任何說明、引號或前後文。
+- 沒被要求改的地方保持原樣，保留原本的語言、用詞、格式和換行。
+- 中文用繁體字和台灣用語，除非要求翻成其他語言。";
+
+/// The system prompt for editing a selection by voice.
+pub fn edit_system(vocab: &[String], note: &str, translate_to: Option<&str>) -> String {
+    let vocab = vocab
+        .iter()
+        .map(|w| w.trim())
+        .filter(|w| !w.is_empty())
+        .collect::<Vec<_>>()
+        .join("、");
+    let prompt = if vocab.is_empty() {
+        EDIT.to_string()
+    } else {
+        format!("{EDIT}\n\n{VOCAB_INTRO}\n{vocab}")
+    };
+    with_requests(prompt, note, translate_to)
+}
+
+pub fn edit_message(selected: &str, said: &str) -> String {
+    format!("<selected>\n{selected}\n</selected>\n<said>\n{said}\n</said>")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -130,6 +202,36 @@ mod tests {
         assert_eq!(to_ai, include_str!("testdata/prompt_v3_tidy_to_ai.txt"));
         let chat = system_prompt(Level::Tidy, Context::Chat, &vocab).unwrap();
         assert_eq!(chat, include_str!("testdata/prompt_v3_tidy_chat.txt"));
+    }
+
+    #[test]
+    fn requests_are_added_only_when_set() {
+        let plain = system_prompt(Level::Tidy, Context::Chat, &[]).unwrap();
+        assert_eq!(
+            system_prompt_for(Level::Tidy, Context::Chat, &[], " ", None).unwrap(),
+            plain
+        );
+        let asked =
+            system_prompt_for(Level::Tidy, Context::Chat, &[], "用敬語", Some("en")).unwrap();
+        assert!(asked.starts_with(&plain));
+        assert!(asked.contains("## 使用者的額外要求\n用敬語"));
+        assert!(asked.contains("翻譯成英文（English）"));
+        assert!(system_prompt_for(Level::Raw, Context::Chat, &[], "x", Some("en")).is_none());
+        // An unknown language code adds nothing.
+        assert_eq!(
+            system_prompt_for(Level::Tidy, Context::Chat, &[], "", Some("xx")).unwrap(),
+            plain
+        );
+    }
+
+    #[test]
+    fn editing_a_selection_fences_both_parts() {
+        let p = edit_system(&["Supabase".into()], "", None);
+        assert!(p.contains("<selected>") && p.ends_with("Supabase"));
+        assert_eq!(
+            edit_message("原文", "改正式一點"),
+            "<selected>\n原文\n</selected>\n<said>\n改正式一點\n</said>"
+        );
     }
 
     #[test]

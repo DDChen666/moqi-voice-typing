@@ -1,6 +1,8 @@
 use rustfft::{num_complex::Complex32, Fft, FftPlanner};
 use std::sync::Arc;
 
+use crate::yuyin::level_boost::LevelBoost;
+
 // `db` below is not true dBFS: it's a per-bin average divided by the FFT
 // window size, which lands ~20 dB low for speech. So this window is calibrated
 // against measured mic audio (dictation ~-32 dBFS, room tone ~-48 dBFS) rather
@@ -11,6 +13,11 @@ const DB_MIN: f32 = -68.0;
 const DB_MAX: f32 = -30.0;
 const GAIN: f32 = 1.3;
 const CURVE_POWER: f32 = 0.7;
+/// Yuyin fork: where a laptop microphone's dictation peaks in this scale
+/// (the loudest band, measured on a MacBook Air: about -38). A quieter
+/// microphone is lifted to here, not to DB_MAX, so it looks like a laptop's
+/// and a laptop's own waveform is left as it was.
+const BOOST_TARGET: f32 = -38.0;
 
 pub struct AudioVisualiser {
     fft: Arc<dyn Fft<f32>>,
@@ -21,6 +28,8 @@ pub struct AudioVisualiser {
     buffer: Vec<f32>,
     window_size: usize,
     buckets: usize,
+    /// Yuyin fork: lifts a quiet microphone's waveform.
+    boost: LevelBoost,
 }
 
 impl AudioVisualiser {
@@ -80,6 +89,7 @@ impl AudioVisualiser {
             buffer: Vec::with_capacity(window_size * 2),
             window_size,
             buckets,
+            boost: LevelBoost::new(BOOST_TARGET, DB_MIN - 4.0),
         }
     }
 
@@ -107,8 +117,8 @@ impl AudioVisualiser {
         // Perform FFT
         self.fft.process(&mut self.fft_input);
 
-        // Compute power spectrum and bucket levels
-        let mut buckets = vec![0.0; self.buckets];
+        // Compute power spectrum and bucket levels (Yuyin fork: in dB first)
+        let mut buckets = vec![f32::NEG_INFINITY; self.buckets];
 
         for (bucket_idx, &(start_bin, end_bin)) in self.bucket_ranges.iter().enumerate() {
             if start_bin >= end_bin || end_bin > self.fft_input.len() / 2 {
@@ -138,7 +148,26 @@ impl AudioVisualiser {
                     NOISE_ALPHA * db + (1.0 - NOISE_ALPHA) * self.noise_floor[bucket_idx];
             }
 
+            // Yuyin fork: mapped below, once the frame's boost is known. No
+            // power at all stays silent however much the frame is lifted.
+            buckets[bucket_idx] = if avg_power > 1e-12 {
+                db
+            } else {
+                f32::NEG_INFINITY
+            };
+        }
+
+        // Yuyin fork: lift a quiet microphone into the window, keeping the
+        // room below it (yuyin/level_boost.rs). Skipped bands stay at zero.
+        let loudest = buckets.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        let boost = self.boost.update(loudest, std::time::Instant::now());
+        for (bucket_idx, &(start_bin, end_bin)) in self.bucket_ranges.iter().enumerate() {
+            if start_bin >= end_bin || end_bin > self.fft_input.len() / 2 {
+                buckets[bucket_idx] = 0.0;
+                continue;
+            }
             // Map configurable dB range to 0-1 with gain and curve shaping
+            let db = buckets[bucket_idx] + boost;
             let normalized = ((db - DB_MIN) / (DB_MAX - DB_MIN)).clamp(0.0, 1.0);
             buckets[bucket_idx] = (normalized * GAIN).powf(CURVE_POWER).clamp(0.0, 1.0);
         }
@@ -158,5 +187,6 @@ impl AudioVisualiser {
         self.buffer.clear();
         // Reset noise floor to initial values
         self.noise_floor.fill(-40.0);
+        self.boost.restart(std::time::Instant::now());
     }
 }

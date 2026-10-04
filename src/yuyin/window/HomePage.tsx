@@ -1,6 +1,13 @@
 // Yuyin fork: the home page — the slogan, what dictation has given the user
 // (insights), the shortcuts, and what has left the machine (privacy).
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { events } from "@/bindings";
 import { useOsType } from "@/hooks/useOsType";
@@ -10,9 +17,14 @@ import { Card, Kbd } from "./ui";
 import { LockIcon } from "./icons";
 import { durationParts, formatCount, keyLabel, tapKeyLabel } from "./format";
 
-/** api.deepseek.com → DeepSeek; other hosts as they are. */
+/** api.deepseek.com → DeepSeek, openrouter.ai → OpenRouter; other hosts as
+ * they are. */
 export const serviceName = (host: string) =>
-  host.includes("deepseek.com") ? "DeepSeek" : host;
+  host.endsWith("deepseek.com")
+    ? "DeepSeek"
+    : host === "openrouter.ai"
+      ? "OpenRouter"
+      : host;
 
 const Big: React.FC<{ parts: { value: string; unit: string }[] }> = ({
   parts,
@@ -21,7 +33,7 @@ const Big: React.FC<{ parts: { value: string; unit: string }[] }> = ({
     {parts.map((p, i) => (
       <React.Fragment key={i}>
         {p.value}
-        <span className="text-[13px] font-medium ms-[3px] me-[6px] last:me-0">
+        <span className="text-[13px] font-medium ms-[3px] me-[6px] last:me-0 whitespace-nowrap">
           {p.unit}
         </span>
       </React.Fragment>
@@ -52,9 +64,16 @@ const LEVEL_FILL = [
 const level = (n: number) =>
   n === 0 ? 0 : n <= 2 ? 1 : n <= 5 ? 2 : n <= 9 ? 3 : 4;
 
+/** One week column: a 10 px cell plus the 3 px gap. */
+const WEEK_PX = 13;
+/** The weekday label column (14 px) and the gap after it (6 px). */
+const LABELS_PX = 20;
+/** Room a month label needs ("10月", "Sep" at 10 px). */
+const MONTH_LABEL_PX = 28;
+
 const ActivityGrid: React.FC<{ stats: YuyinStats }> = ({ stats }) => {
   const { t, i18n } = useTranslation();
-  const weeks = useMemo(() => {
+  const allWeeks = useMemo(() => {
     const out: ({ date: string; count: number } | null)[][] = [];
     for (let i = 0; i < stats.days.length; i += 7) {
       const week: ({ date: string; count: number } | null)[] = stats.days
@@ -65,6 +84,25 @@ const ActivityGrid: React.FC<{ stats: YuyinStats }> = ({ stats }) => {
     }
     return out;
   }, [stats.days]);
+
+  // Show as many recent weeks as the card has room for. The card narrows
+  // with the window, and on Windows with the system text size (WebView2
+  // zooms the page by it), so a fixed half year spilled out of the card.
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+  useLayoutEffect(() => {
+    const box = boxRef.current;
+    if (!box) return;
+    const measure = () => setWidth(box.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, []);
+  const fits = width
+    ? Math.max(1, Math.floor((width - LABELS_PX + 3) / WEEK_PX))
+    : allWeeks.length;
+  const weeks = allWeeks.slice(-fits);
 
   const monthFmt = new Intl.DateTimeFormat(i18n.language, { month: "short" });
   const dayFmt = new Intl.DateTimeFormat(i18n.language, {
@@ -77,16 +115,24 @@ const ActivityGrid: React.FC<{ stats: YuyinStats }> = ({ stats }) => {
     if (!first) return;
     const d = new Date(`${first.date}T12:00:00`);
     const prev = i > 0 ? weeks[i - 1][0] : null;
+    const left = i * WEEK_PX;
+    // A label that would run past the card is left out rather than wrapped.
+    const room = !width || LABELS_PX + left + MONTH_LABEL_PX <= width;
     if (
-      !prev ||
-      new Date(`${prev.date}T12:00:00`).getMonth() !== d.getMonth()
+      room &&
+      (!prev || new Date(`${prev.date}T12:00:00`).getMonth() !== d.getMonth())
     ) {
-      months.push({ left: i * 13, label: monthFmt.format(d) });
+      // The first column can hold the last days of a month; when the next
+      // month starts right after, the two labels would overlap, so the
+      // partial month gives way.
+      const last = months[months.length - 1];
+      if (last && left - last.left < MONTH_LABEL_PX) months.pop();
+      months.push({ left, label: monthFmt.format(d) });
     }
   });
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div ref={boxRef} className="flex flex-col gap-1.5 min-w-0">
       <div className="flex gap-1.5">
         <div className="w-3.5 flex flex-col gap-[3px] text-[9px] leading-[10px] text-muted">
           {[
@@ -135,11 +181,11 @@ const ActivityGrid: React.FC<{ stats: YuyinStats }> = ({ stats }) => {
         </div>
       </div>
       <div className="flex items-center justify-between ps-5">
-        <div className="relative h-3" style={{ width: weeks.length * 13 }}>
+        <div className="relative h-3" style={{ width: weeks.length * WEEK_PX }}>
           {months.map((m) => (
             <span
               key={m.left}
-              className="absolute top-0 text-[10px] leading-3 text-muted"
+              className="absolute top-0 text-[10px] leading-3 text-muted whitespace-nowrap"
               style={{ left: m.left }}
             >
               {m.label}
@@ -159,6 +205,7 @@ export const HomePage: React.FC<{
   const os = useOsType();
   const { settings } = useSettings();
   const [stats, setStats] = useState<YuyinStats | null>(null);
+  const [learn, setLearn] = useState<boolean | null | undefined>(undefined);
 
   const load = useCallback(() => {
     yuyinApi
@@ -166,6 +213,22 @@ export const HomePage: React.FC<{
       .then(setStats)
       .catch((e) => console.error("Failed to load stats:", e));
   }, []);
+
+  useEffect(() => {
+    yuyinApi
+      .getConfig()
+      .then((c) => setLearn(c.learn_from_edits))
+      .catch(() => {});
+  }, []);
+
+  const answerLearn = async (on: boolean) => {
+    setLearn(on);
+    try {
+      await yuyinApi.updateConfig({ learn_from_edits: on });
+    } catch (e) {
+      console.error("Failed to save the learning choice:", e);
+    }
+  };
 
   useEffect(() => {
     load();
@@ -194,6 +257,36 @@ export const HomePage: React.FC<{
         </p>
       </div>
 
+      {/* Ask once, after a few dictations (docs/隱私.md: off until asked). */}
+      {learn === null && (s?.dictations ?? 0) >= 3 && (
+        <Card className="px-[18px] py-4 flex items-center justify-between gap-5">
+          <div className="flex flex-col gap-1 min-w-0">
+            <h2 className="m-0 text-[13px] font-semibold text-text">
+              {t("moqi.learn.askTitle")}
+            </h2>
+            <p className="m-0 text-[12px] leading-relaxed text-text/80">
+              {t("moqi.learn.askBody")}
+            </p>
+          </div>
+          <div className="flex flex-col gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => answerLearn(true)}
+              className="text-[12px] font-medium px-3.5 py-[5px] rounded-[8px] bg-logo-primary text-white hover:brightness-110"
+            >
+              {t("moqi.learn.askYes")}
+            </button>
+            <button
+              type="button"
+              onClick={() => answerLearn(false)}
+              className="text-[12px] px-3.5 py-[5px] rounded-[8px] bg-fill text-text hover:brightness-95"
+            >
+              {t("moqi.learn.askNo")}
+            </button>
+          </div>
+        </Card>
+      )}
+
       <div className="grid grid-cols-[minmax(0,1fr)_220px] gap-5 items-start">
         <div className="flex flex-col gap-3.5">
           <div className="flex items-baseline justify-between">
@@ -209,7 +302,7 @@ export const HomePage: React.FC<{
               parts={[
                 {
                   value: formatCount(s?.chars ?? 0, lang),
-                  unit: t("moqi.unit.chars"),
+                  unit: t("moqi.unit.chars", { count: s?.chars ?? 0 }),
                 },
               ]}
               label={t("moqi.home.chars")}
@@ -246,7 +339,7 @@ export const HomePage: React.FC<{
                     {n}
                   </span>
                   <span className="text-[12px] ms-[3px] text-text">
-                    {t("moqi.unit.days")}
+                    {t("moqi.unit.days", { count: Number(n) })}
                   </span>
                   <div className="text-[11px] text-muted mt-0.5">{label}</div>
                 </div>
@@ -329,7 +422,9 @@ export const HomePage: React.FC<{
                 </span>
                 <span className="text-[13px] font-semibold text-text whitespace-nowrap">
                   {formatCount(s?.privacy.text_sent_chars ?? 0, lang)}{" "}
-                  {t("moqi.unit.chars")}
+                  {t("moqi.unit.chars", {
+                    count: s?.privacy.text_sent_chars ?? 0,
+                  })}
                 </span>
               </div>
               <div className="text-[11px] text-muted leading-relaxed">

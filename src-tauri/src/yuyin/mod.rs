@@ -15,17 +15,27 @@
 //!    still safe; if the user switched windows we copy instead.
 
 pub mod app_menu;
+pub mod apps;
 pub mod chunker;
 pub mod commands;
 pub mod config;
 pub mod context;
 pub mod defaults;
 pub mod field_probe;
+#[cfg(target_os = "windows")]
+pub mod focus_return;
+pub mod learn;
+pub mod level_boost;
 pub mod output;
 pub mod polish;
 pub mod prompt;
 pub mod replay;
 pub mod secrets;
 pub mod session;
+pub mod snippets;
 pub mod stats;
+pub mod sync;
+pub mod warmup;
+#[cfg(target_os = "windows")]
+pub mod window_look;
 pub mod wording;

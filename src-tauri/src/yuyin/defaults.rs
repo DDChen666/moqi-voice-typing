@@ -14,7 +14,13 @@ use crate::settings::{self, ModelUnloadTimeout, ShortcutActivation};
 
 /// Hold right Option to talk (product definition: Fn or right Option on Mac;
 /// Fn only works reliably on Apple keyboards).
+#[cfg(not(target_os = "windows"))]
 const TALK_KEY: &str = "option_right";
+/// The same key on a PC keyboard: right Alt. handy-keys reads it from its
+/// own key code, and on layouts where it is AltGr it drops the Left Ctrl
+/// that Windows adds, so it works on Chinese (Taiwan), US and AltGr layouts.
+#[cfg(target_os = "windows")]
+const TALK_KEY: &str = "alt_right";
 
 /// Qwen3-ASR 1.7B at Handy's default quant: the engine M0 chose. When the file
 /// is already in the models dir (pre-installed), we select it and skip the

@@ -1,0 +1,4 @@
+# The clean-up prompt fixtures are compared byte for byte with the prompt
+# the app builds (prompt.rs tests), so keep their LF line endings on Windows
+# checkouts too (core.autocrlf would turn them into CRLF).
+src-tauri/src/yuyin/testdata/*.txt text eol=lf

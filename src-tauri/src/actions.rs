@@ -489,6 +489,10 @@ impl ShortcutAction for TranscribeAction {
         // Load ASR model and VAD model in parallel
         let kickoff_started = Instant::now();
         tm.initiate_model_load();
+        // Yuyin fork: after a rest the model is slow again (cold GPU kernels
+        // on Windows, weights swapped out on macOS); warm it while the user
+        // speaks (see yuyin/warmup.rs).
+        crate::yuyin::warmup::rewarm_if_idle(&tm);
         let rm_clone = Arc::clone(&rm);
         std::thread::spawn(move || {
             if let Err(e) = rm_clone.preload_vad() {
@@ -849,12 +853,30 @@ impl ShortcutAction for TranscribeAction {
                                     // Chinese text before clean-up, not the engine's
                                     // Simplified output.
                                     let converted = processed.final_text.clone();
-                                    if !handy_post_process {
-                                        let polished = crate::yuyin::polish::polish(
-                                            &ah,
-                                            &processed.final_text,
-                                        )
-                                        .await;
+                                    let cfg = crate::yuyin::config::get(&ah);
+                                    let snippet = crate::yuyin::snippets::expand(
+                                        &cfg.snippets,
+                                        &processed.final_text,
+                                    )
+                                    .map(str::to_string);
+                                    if let Some(text) = snippet {
+                                        // Yuyin fork: a voice snippet is pasted as
+                                        // written, without the clean-up.
+                                        crate::yuyin::session::mark_polished(
+                                            cfg.level,
+                                            crate::yuyin::session::PolishOutcome::Skipped,
+                                            text.chars().count(),
+                                        );
+                                        processed.post_processed_text = Some(text.clone());
+                                        processed.final_text = text;
+                                    } else if !handy_post_process {
+                                        // Yuyin fork: the user's learned corrections,
+                                        // before the clean-up and again after it.
+                                        let corrected =
+                                            crate::yuyin::learn::apply(&ah, &processed.final_text);
+                                        let polished =
+                                            crate::yuyin::polish::polish(&ah, &corrected).await;
+                                        let polished = crate::yuyin::learn::apply(&ah, &polished);
                                         if polished != processed.final_text {
                                             processed.post_processed_text = Some(polished.clone());
                                         }
@@ -927,6 +949,13 @@ impl ShortcutAction for TranscribeAction {
                                     let pasted = result.is_ok() && !copy_only;
                                     if pasted {
                                         crate::yuyin::field_probe::after_paste(
+                                            &ah_clone,
+                                            probe_front.clone(),
+                                            probe_text.clone(),
+                                        );
+                                        // Yuyin fork: learn from the user's corrections
+                                        // (only once they turned it on).
+                                        crate::yuyin::learn::after_paste(
                                             &ah_clone,
                                             probe_front,
                                             probe_text,

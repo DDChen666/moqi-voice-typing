@@ -189,6 +189,17 @@ fn windows_taskbar_theme() -> Option<AppTheme> {
 /// blocked (macOS Secure Input); recording/transcribing states keep their
 /// normal icons so in-flight activity stays recognizable.
 pub fn get_icon_path(theme: AppTheme, state: TrayIconState, warning: bool) -> &'static str {
+    // Yuyin fork: the Windows notification area shows colour icons (the app
+    // icon, red while recording), which read on light and dark taskbars
+    // alike; the monochrome glyphs are macOS menu bar templates.
+    if cfg!(target_os = "windows") {
+        return match (state, warning) {
+            (TrayIconState::Idle, true) => "resources/tray_win_warning.png",
+            (TrayIconState::Idle, false) => "resources/tray_win_idle.png",
+            (TrayIconState::Recording, _) => "resources/tray_win_recording.png",
+            (TrayIconState::Transcribing, _) => "resources/tray_win_transcribing.png",
+        };
+    }
     if warning && state == TrayIconState::Idle {
         return match theme {
             AppTheme::Dark => "resources/tray_idle_warning.png",
@@ -643,6 +654,9 @@ pub fn paste_last_transcript(app: &AppHandle) {
     if text.trim().is_empty() {
         return;
     }
+    // The Windows tray menu takes the foreground; give it back first.
+    #[cfg(target_os = "windows")]
+    crate::yuyin::focus_return::restore();
     if let Err(err) = crate::utils::paste(text, app.clone()) {
         error!("Failed to paste last transcript: {}", err);
     }

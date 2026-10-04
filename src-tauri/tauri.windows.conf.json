@@ -3,6 +3,18 @@
     "resources": {
       "resources": "resources",
       "transcribe-libs": "."
+    },
+    "windows": {
+      "nsis": {
+        "languages": ["TradChinese", "English"],
+        "displayLanguageSelector": false,
+        "customLanguageFiles": {
+          "TradChinese": "nsis/TradChinese.nsh"
+        },
+        "installerIcon": "icons/icon.ico",
+        "sidebarImage": "nsis/sidebar.bmp",
+        "headerImage": "nsis/header.bmp"
+      }
     }
   }
 }

@@ -97,7 +97,7 @@
   );
   box-shadow: var(--up);
   color: var(--color-text);
-  font-family: -apple-system, system-ui, sans-serif;
+  font-family: -apple-system, "Segoe UI Variable Text", system-ui, sans-serif;
   animation: yy-press 3.6s ease-in-out 1.6s infinite;
 }
 

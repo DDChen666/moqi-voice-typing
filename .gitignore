@@ -45,3 +45,6 @@ result
 
 # Python bytecode (scripts/)
 __pycache__/
+
+# Release builds (scripts/windows/release.ps1)
+dist-release/

@@ -59,6 +59,25 @@
     ${dot ? `<circle cx="15.6" cy="3" r="2.2" fill="${dot}"/>` : ""}
   </svg>`;
   }
+  // Windows notification-area icon: colour, not a template. The app icon's
+  // squircle fills the square (no macOS grid margin) and the glyph is drawn
+  // thicker so it survives the 16 px the taskbar shows at 100 % scaling.
+  const SQ_TRAY = squircle(512, 500);
+  function trayWin(bg, { glyph = 1, dot = null } = {}) {
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+    <defs><linearGradient id="tb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${bg[0]}"/><stop offset="1" stop-color="${bg[1]}"/></linearGradient></defs>
+    <path d="${SQ_TRAY}" fill="url(#tb)"/>
+    <path d="${SQ_TRAY}" fill="none" stroke="#fff" stroke-opacity="0.28" stroke-width="36"/>
+    <g opacity="${glyph}" transform="translate(507 512) scale(1.3) translate(-507 -512)">
+      <path d="${WAVE}" fill="none" stroke="#fff" stroke-width="84" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="716" y="318" width="64" height="388" rx="32" fill="#fff"/>
+    </g>
+    ${dot ? `<circle cx="832" cy="192" r="176" fill="${dot}" stroke="#000" stroke-opacity="0.3" stroke-width="24"/>` : ""}
+  </svg>`;
+  }
+  const OBSIDIAN = ["#3a3a3f", "#0c0c0e"],
+    RECORDING = ["#ff5a50", "#d70015"];
+
   const WHITE = "#ffffff",
     BLACK = "#000000",
     RED = "#ff453a",
@@ -80,6 +99,11 @@
     "recording.png": [glyph(RED), 64],
     "transcribing.png": [glyph("#8e8e93"), 64],
     "handy_warning.png": [glyph("#8e8e93", { dot: AMBER }), 64],
+    // Windows notification area (colour icons; see tray.rs).
+    "tray_win_idle.png": [trayWin(OBSIDIAN), 32],
+    "tray_win_recording.png": [trayWin(RECORDING), 32],
+    "tray_win_transcribing.png": [trayWin(OBSIDIAN, { glyph: 0.45 }), 32],
+    "tray_win_warning.png": [trayWin(OBSIDIAN, { dot: AMBER }), 32],
   };
 
   async function render(svg, size) {
