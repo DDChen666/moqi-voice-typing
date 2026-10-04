@@ -1045,7 +1045,7 @@
       "getKey": "Get a key from {{service}}",
       "testResultTimed": "Result ({{seconds}} s): {{text}}",
       "localModelName": "the local model",
-      "rawSkips": "{{service}} is set up, but Raw never uses it: what you say isn't sent for clean-up.",
+      "rawSkips": "{{service}} is set up, but “As spoken” never uses it: what you say isn't sent for clean-up.",
       "useTidy": "Switch to Tidy",
       "openrouterNotes": {
         "deepseek": "Recommended: cheapest, strong Chinese",
