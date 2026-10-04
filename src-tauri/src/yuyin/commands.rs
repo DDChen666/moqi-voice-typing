@@ -1,6 +1,10 @@
 //! Tauri commands for the Yuyin settings panel (`src/yuyin/` in the frontend).
 
-use tauri::AppHandle;
+use std::sync::Arc;
+
+use tauri::{AppHandle, Manager};
+
+use crate::managers::history::HistoryManager;
 
 use super::config::{self, YuyinConfig};
 use super::{polish, secrets};
@@ -52,6 +56,41 @@ pub fn yuyin_set_api_key(
 #[specta::specta]
 pub fn yuyin_learned(app: AppHandle) -> Vec<super::learn::Rule> {
     super::learn::rules(&app)
+}
+
+/// The user corrected dictation `id` in the history: learn from it at once,
+/// and keep the corrected text as the entry's text.
+#[tauri::command]
+#[specta::specta]
+pub async fn yuyin_teach(
+    app: AppHandle,
+    id: i64,
+    corrected: String,
+) -> Result<super::learn::Taught, String> {
+    let history = Arc::clone(&app.state::<Arc<HistoryManager>>());
+    let entry = history
+        .get_entry_by_id(id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("history entry {id} not found"))?;
+    let before = entry
+        .post_processed_text
+        .clone()
+        .unwrap_or_else(|| entry.transcription_text.clone());
+    let corrected = corrected.trim().to_string();
+    if corrected.is_empty() || corrected == before.trim() {
+        return Ok(super::learn::Taught::default());
+    }
+    let taught = super::learn::teach(&app, &before, &corrected);
+    history
+        .update_transcription(
+            id,
+            entry.transcription_text,
+            Some(corrected),
+            entry.post_process_prompt,
+        )
+        .map_err(|e| e.to_string())?;
+    Ok(taught)
 }
 
 /// Apply a learned correction from now on (`active`), or forget it for good.

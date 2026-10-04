@@ -1,16 +1,32 @@
-//! Learning from the user's own corrections (自動學詞, roadmap 1.1).
+//! Learning from the user's own corrections (自動學詞).
 //!
-//! After Moqi pastes, the field it typed into is read now and then (the same
-//! `session::focused_field` as the field probe) until the user is done with
-//! it. Words the user corrected in what Moqi typed — 蘇帕貝斯 → Supabase,
-//! 這周 → 這週 — are counted; a correction seen twice is applied to later
-//! dictations, before and after the clean-up, and a corrected English term
-//! also joins the dictionary so the clean-up spells it the same way.
+//! Two ways in, one store of corrections (`yuyin_learned.json`):
 //!
-//! Privacy (docs/隱私.md): off until the user turns it on
+//! - **Watched** ([`after_paste`]): after Moqi pastes, the field it typed
+//!   into is read now and then (the same `session::focused_field` as the
+//!   field probe) until the user is done with it. Apps that hide their
+//!   fields until asked (VS Code, Slack…) are asked at the key press
+//!   (`session::wake_accessibility`).
+//! - **Taught** ([`teach`]): the user corrects a dictation in Moqi's history.
+//!   It works the same in every app on every platform, because nothing is
+//!   read from other apps.
+//!
+//! Either way, a correction is learned at once when it fixes a misheard
+//! word: one turned into an English term (蘇帕貝斯 → Supabase), or a Chinese
+//! word that sounds alike (實做 → 實作, 時辰 → 時程; [`sounds_alike`]). A
+//! correction that changes the sound (但是 → 可是) is a rewording, not a
+//! misheard word: applied everywhere it would replace every 但是 the user
+//! ever says, so it is learned only once the user has made it twice.
+//!
+//! A learned correction is applied to later dictations, before and after the
+//! clean-up. Its corrected word also joins the dictionary, which the
+//! clean-up spells by and the recognizer listens for (`asr_vocab`), so the
+//! word comes out right however it would have been misheard next time.
+//!
+//! Privacy (docs/隱私.md): watching is off until the user turns it on
 //! (`YuyinConfig::learn_from_edits`); the field's text is compared in memory
-//! and dropped; only the corrected words are saved (`yuyin_learned.json`);
-//! nothing is sent anywhere; password boxes are never read.
+//! and dropped; only the corrected words are saved; nothing is sent
+//! anywhere; password boxes are never read.
 
 use std::path::PathBuf;
 use std::sync::RwLock;
@@ -28,7 +44,10 @@ use super::session;
 
 const FILE: &str = "yuyin_learned.json";
 const FIRST_LOOK: Duration = Duration::from_millis(1200);
-const EVERY: Duration = Duration::from_secs(1);
+/// How often the field is read. A chat box empties when the user sends, and
+/// the last reading before that is the corrected text: at 1 s a fix made
+/// just before pressing Enter was often missed.
+const EVERY: Duration = Duration::from_millis(500);
 /// The paste must show up in the field this soon, or there is nothing to watch.
 const SHOWS_WITHIN: Duration = Duration::from_secs(5);
 /// Done once the text has stopped changing for this long after an edit.
@@ -37,8 +56,9 @@ const SETTLED: Duration = Duration::from_secs(6);
 const UNTOUCHED: Duration = Duration::from_secs(45);
 const LONGEST: Duration = Duration::from_secs(180);
 /// Focus is gone after this many unreadable looks in a row.
-const MAX_MISSES: u32 = 3;
-/// A correction made this many times is applied from then on.
+const MAX_MISSES: u32 = 6;
+/// A rewording made this many times is applied from then on (a misheard
+/// word needs one; see the module docs).
 pub const TIMES_TO_LEARN: u32 = 2;
 
 /// One correction the user made: `from` (what Moqi typed) → `to`.
@@ -461,35 +481,173 @@ fn correction(
 // ---------------------------------------------------------------- remembering
 
 fn record(app: &AppHandle, found: &[(String, String)]) {
-    let terms = with_store(app, |store| {
-        let terms = learn_into(store, found, now_ms());
-        (terms, true)
+    let learned = with_store(app, |store| {
+        let learned = learn_into(store, found, now_ms(), false);
+        (learned, true)
     });
     super::sync::changed();
-    if terms.is_empty() {
+    add_to_dictionary(app, &dictionary_words(&learned));
+}
+
+/// The corrected words worth a dictionary entry: misheard terms only, so a
+/// rewording (但是 → 可是) never crowds the recognizer's list.
+fn dictionary_words(learned: &[(String, String)]) -> Vec<String> {
+    learned
+        .iter()
+        .filter(|(from, to)| is_term(to) && misheard(from, to))
+        .map(|(_, to)| to.clone())
+        .collect()
+}
+
+/// What one taught correction learned, for the history page to show.
+#[derive(Clone, Debug, Default, Serialize, Type, PartialEq)]
+pub struct Taught {
+    /// Corrections now applied to new dictations: (what Moqi typed, the fix).
+    pub corrections: Vec<(String, String)>,
+    /// Rewordings noted but not applied until the user makes them again.
+    pub noted: Vec<(String, String)>,
+    /// Words now in the dictionary (and listened for by the recognizer).
+    pub words: Vec<String>,
+}
+
+/// The user corrected `before` (what Moqi typed) into `after` in Moqi's
+/// history: learn the misheard words at once, note the rewordings.
+pub fn teach(app: &AppHandle, before: &str, after: &str) -> Taught {
+    let found = corrections(&normalize(before), &normalize(after));
+    if found.is_empty() {
+        return Taught::default();
+    }
+    let active = with_store(app, |store| {
+        learn_into(store, &found, now_ms(), true);
+        let active: Vec<(String, String)> = found
+            .iter()
+            .filter(|(from, to)| {
+                store
+                    .rules
+                    .iter()
+                    .any(|r| r.active && r.from == *from && r.to == *to)
+            })
+            .cloned()
+            .collect();
+        (active, true)
+    });
+    super::sync::changed();
+    let words = dictionary_words(&active);
+    add_to_dictionary(app, &words);
+    debug!(
+        "learn: taught {} correction(s), {} applied now",
+        found.len(),
+        active.len()
+    );
+    Taught {
+        noted: found.into_iter().filter(|f| !active.contains(f)).collect(),
+        corrections: active,
+        words,
+    }
+}
+
+/// Worth a dictionary entry: an English term, or two or more Chinese
+/// characters (a name or term of art, not a lone particle).
+fn is_term(word: &str) -> bool {
+    word.chars().any(|c| c.is_ascii_alphabetic())
+        || word.chars().filter(|c| c.is_alphabetic()).count() >= 2
+}
+
+/// Put `words` in the dictionary (once each) and in front of the
+/// recognizer's list.
+fn add_to_dictionary(app: &AppHandle, words: &[String]) {
+    if words.is_empty() {
         return;
     }
-    // A learned English term also goes into the dictionary, so the clean-up
-    // keeps the same spelling.
     let mut cfg = config::get(app);
     let mut added = false;
-    for term in terms {
-        if !cfg.vocab.iter().any(|w| w.eq_ignore_ascii_case(&term)) {
-            cfg.vocab.push(term);
+    for word in words {
+        if !cfg.vocab.iter().any(|w| w.eq_ignore_ascii_case(word)) {
+            cfg.vocab.push(word.clone());
             added = true;
         }
     }
     if added {
         if let Err(e) = config::set(app, cfg) {
-            warn!("Failed to add a learned term to the dictionary: {e}");
+            warn!("Failed to add a learned word to the dictionary: {e}");
         }
+    }
+    super::asr_vocab::touch(app, words);
+}
+
+/// A misheard word rather than a reworded one (see the module docs).
+fn misheard(from: &str, to: &str) -> bool {
+    to.chars().any(|c| c.is_ascii_alphabetic()) || sounds_alike(from, to)
+}
+
+/// How many times a correction must be seen before it is applied.
+fn times_needed(from: &str, to: &str) -> u32 {
+    if misheard(from, to) {
+        1
+    } else {
+        TIMES_TO_LEARN
     }
 }
 
-/// Count `found` into the store; returns the English terms that just became
-/// active (for the dictionary).
-fn learn_into(store: &mut Store, found: &[(String, String)], now: f64) -> Vec<String> {
-    let mut terms = Vec::new();
+/// Whether two Chinese spellings sound alike in Mandarin: the same number
+/// of syllables, each sharing a reading (any reading of a 破音字), counting
+/// the pairs a Taiwanese accent and the recognizer mix up as one (zh/z,
+/// ch/c, sh/s, n/l, -ng/-n), the way input methods' 模糊音 do.
+fn sounds_alike(a: &str, b: &str) -> bool {
+    let (x, y) = (syllables(a), syllables(b));
+    match (x, y) {
+        (Some(x), Some(y)) => {
+            !x.is_empty()
+                && x.len() == y.len()
+                && x.iter()
+                    .zip(&y)
+                    .all(|(p, q)| p.iter().any(|r| q.contains(r)))
+        }
+        _ => false,
+    }
+}
+
+/// Each Chinese character's readings (fuzzy, toneless); punctuation and
+/// spaces are skipped. None if `s` has anything else (Latin letters).
+fn syllables(s: &str) -> Option<Vec<Vec<String>>> {
+    use pinyin::ToPinyinMulti;
+    let mut out = Vec::new();
+    for c in s.chars() {
+        if let Some(readings) = c.to_pinyin_multi() {
+            out.push(readings.into_iter().map(|p| fuzzy(p.plain())).collect());
+        } else if c.is_alphanumeric() {
+            return None;
+        }
+    }
+    Some(out)
+}
+
+fn fuzzy(syllable: &str) -> String {
+    let mut s = syllable.to_string();
+    for (from, to) in [("zh", "z"), ("ch", "c"), ("sh", "s"), ("l", "n")] {
+        if let Some(rest) = s.strip_prefix(from) {
+            s = format!("{to}{rest}");
+            break;
+        }
+    }
+    for (from, to) in [("ang", "an"), ("eng", "en"), ("ing", "in")] {
+        if let Some(stem) = s.strip_suffix(from) {
+            s = format!("{stem}{to}");
+            break;
+        }
+    }
+    s
+}
+
+/// Count `found` into the store (`taught`: corrected in Moqi itself); returns
+/// the corrections that just became active.
+fn learn_into(
+    store: &mut Store,
+    found: &[(String, String)],
+    now: f64,
+    taught: bool,
+) -> Vec<(String, String)> {
+    let mut learned = Vec::new();
     for (from, to) in found {
         // The user changed one of our corrections back: stop applying it.
         if let Some(rule) = store
@@ -523,16 +681,18 @@ fn learn_into(store: &mut Store, found: &[(String, String)], now: f64) -> Vec<St
         };
         let rule = &mut store.rules[index];
         if rule.dismissed {
-            continue;
+            // Removed once, but the user just taught it again on purpose.
+            if !taught {
+                continue;
+            }
+            rule.dismissed = false;
         }
         rule.count += 1;
         rule.last_seen = now;
         rule.changed = now;
-        if rule.count >= TIMES_TO_LEARN && !rule.active {
+        if rule.count >= times_needed(from, to) && !rule.active {
             rule.active = true;
-            if to.chars().any(|c| c.is_ascii_alphabetic()) {
-                terms.push(to.clone());
-            }
+            learned.push((from.clone(), to.clone()));
             // One correction per word: the newest wins.
             for other in store.rules.iter_mut() {
                 if other.from == *from && other.to != *to && other.active {
@@ -542,7 +702,7 @@ fn learn_into(store: &mut Store, found: &[(String, String)], now: f64) -> Vec<St
             }
         }
     }
-    terms
+    learned
 }
 
 /// Everything learned, for the dictionary page: in use first, newest first.
@@ -681,32 +841,109 @@ mod tests {
     }
 
     #[test]
-    fn learns_after_two_and_stops_when_undone() {
+    fn a_rewording_needs_two_and_stops_when_undone() {
         let mut store = Store::default();
-        let found = vec![pair("蘇帕貝斯", "Supabase")];
-        assert!(learn_into(&mut store, &found, 1.0).is_empty());
+        let found = vec![pair("明天", "後天")];
+        assert!(learn_into(&mut store, &found, 1.0, false).is_empty());
         assert!(!store.rules[0].active);
-        assert_eq!(
-            learn_into(&mut store, &found, 2.0),
-            vec!["Supabase".to_string()]
-        );
+        assert_eq!(learn_into(&mut store, &found, 2.0, false), found);
         assert!(store.rules[0].active);
         // The user changed it back: no longer applied, never relearned.
-        learn_into(&mut store, &[pair("Supabase", "蘇帕貝斯")], 3.0);
+        learn_into(&mut store, &[pair("後天", "明天")], 3.0, false);
         assert!(!store.rules[0].active && store.rules[0].dismissed);
-        learn_into(&mut store, &found, 4.0);
-        learn_into(&mut store, &found, 5.0);
+        learn_into(&mut store, &found, 4.0, false);
+        learn_into(&mut store, &found, 5.0, false);
         assert!(!store.rules[0].active);
+    }
+
+    #[test]
+    fn an_english_term_is_learned_the_first_time() {
+        let mut store = Store::default();
+        let found = vec![pair("蘇帕貝斯", "Supabase")];
+        assert_eq!(learn_into(&mut store, &found, 1.0, false), found);
+        assert!(store.rules[0].active);
+    }
+
+    #[test]
+    fn a_misheard_chinese_word_is_learned_at_once_a_rewording_twice() {
+        let mut store = Store::default();
+        let misheard = vec![pair("實做", "實作")];
+        assert_eq!(learn_into(&mut store, &misheard, 1.0, false), misheard);
+        let reworded = vec![pair("但是", "可是")];
+        assert!(learn_into(&mut store, &reworded, 2.0, true).is_empty());
+        assert_eq!(learn_into(&mut store, &reworded, 3.0, true), reworded);
+    }
+
+    #[test]
+    fn misheard_words_sound_alike_rewordings_do_not() {
+        for (a, b) in [
+            ("實做", "實作"),
+            ("連接", "連結"),
+            ("先定", "先訂"),
+            ("太滑", "太花"),
+            ("這周", "這週"),
+            ("時辰", "時程"), // -n / -ng
+            ("果他", "果它"),
+            ("流覽", "瀏覽"),
+        ] {
+            assert!(sounds_alike(a, b), "{a} / {b}");
+        }
+        for (a, b) in [
+            ("但是", "可是"),
+            ("這樣", "真的"),
+            ("出來", "出現得"),
+            ("明天", "後天"),
+            ("那個你", "欸你"),
+            ("Cloud", "Claude"),
+        ] {
+            assert!(!sounds_alike(a, b), "{a} / {b}");
+        }
+    }
+
+    #[test]
+    fn only_misheard_terms_join_the_dictionary() {
+        let learned = vec![
+            pair("蘇帕貝斯", "Supabase"),
+            pair("時辰", "時程"),
+            pair("但是", "可是"),
+            pair("周", "週"),
+        ];
+        assert_eq!(
+            dictionary_words(&learned),
+            vec!["Supabase".to_string(), "時程".to_string()]
+        );
+    }
+
+    #[test]
+    fn a_taught_correction_is_learned_again_even_if_removed_before() {
+        let mut store = Store::default();
+        let found = vec![pair("時辰", "時程")];
+        assert_eq!(learn_into(&mut store, &found, 1.0, true), found);
+        assert!(store.rules[0].active);
+        // Removed on the dictionary page, then taught again on purpose.
+        store.rules[0].active = false;
+        store.rules[0].dismissed = true;
+        assert_eq!(learn_into(&mut store, &found, 2.0, true), found);
+        assert!(store.rules[0].active && !store.rules[0].dismissed);
+    }
+
+    #[test]
+    fn terms_worth_a_dictionary_entry() {
+        assert!(is_term("Supabase"));
+        assert!(is_term("時程"));
+        assert!(is_term("默契"));
+        assert!(!is_term("週"));
+        assert!(!is_term("，"));
     }
 
     #[test]
     fn the_newest_correction_of_a_word_wins() {
         let mut store = Store::default();
         for _ in 0..2 {
-            learn_into(&mut store, &[pair("時辰", "時程")], 1.0);
+            learn_into(&mut store, &[pair("時辰", "時程")], 1.0, false);
         }
         for _ in 0..2 {
-            learn_into(&mut store, &[pair("時辰", "時間")], 2.0);
+            learn_into(&mut store, &[pair("時辰", "時間")], 2.0, false);
         }
         let active: Vec<_> = store.rules.iter().filter(|r| r.active).collect();
         assert_eq!(active.len(), 1);

@@ -699,6 +699,7 @@ pub fn run(cli_args: CliArgs) {
             yuyin::commands::yuyin_openrouter_models,
             yuyin::commands::yuyin_learned,
             yuyin::commands::yuyin_set_learned,
+            yuyin::commands::yuyin_teach,
             yuyin::commands::yuyin_sync_status,
             yuyin::commands::yuyin_set_sync_folder,
             yuyin::commands::yuyin_sync_now,
