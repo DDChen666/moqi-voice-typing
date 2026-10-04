@@ -6,7 +6,8 @@
 <br>
 
 <p align="center">
-  <a href="https://github.com/DDChen666/moqi-voice-typing/releases/latest"><img src="docs/media/download-en.png" width="300" alt="Download for macOS"></a>
+  <a href="https://github.com/DDChen666/moqi-voice-typing/releases/tag/v1.0.0"><img src="docs/media/download-en.png" width="300" alt="Download for macOS"></a>
+  <a href="https://github.com/DDChen666/moqi-voice-typing/releases/latest"><img src="docs/media/download-windows-en.png" width="300" alt="Download for Windows"></a>
 </p>
 
 <p align="center">
@@ -20,7 +21,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 1.1.0" src="https://img.shields.io/badge/version-1.1.0-0a84ff?style=flat-square">
+  <img alt="Version: Windows 1.1.0, Mac 1.0.0" src="https://img.shields.io/badge/version-Windows%201.1.0%20%C2%B7%20Mac%201.0.0-0a84ff?style=flat-square">
   <img alt="macOS 15+" src="https://img.shields.io/badge/macOS-15%2B-1d1d1f?style=flat-square&logo=apple&logoColor=white">
   <img alt="Apple silicon" src="https://img.shields.io/badge/Apple-silicon-1d1d1f?style=flat-square">
   <img alt="Windows 10 and 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?style=flat-square">
@@ -72,7 +73,7 @@ Hold the right Option key (right Alt on Windows), speak, let go — the text app
 
 **Mac**
 
-1. [Download](https://github.com/DDChen666/moqi-voice-typing/releases/latest) `Moqi_1.1.0_aarch64.dmg` and drag Moqi into Applications.
+1. [Download](https://github.com/DDChen666/moqi-voice-typing/releases/tag/v1.0.0) `Moqi_1.0.0_aarch64.dmg` and drag Moqi into Applications. The Mac is on 1.0.0 for now; 1.1.0's new features follow in a later Mac build.
 2. The first launch is blocked because Moqi isn't signed with a paid Apple Developer ID. Open **System Settings → Privacy & Security** and click **Open Anyway**. If macOS says the app "is damaged", run `xattr -dr com.apple.quarantine /Applications/Moqi.app` in Terminal.
 3. Follow the three setup steps: allow permissions, choose Raw or Tidy, and try a sentence.
 

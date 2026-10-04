@@ -6,7 +6,8 @@
 <br>
 
 <p align="center">
-  <a href="https://github.com/DDChen666/moqi-voice-typing/releases/latest"><img src="docs/media/download.png" width="300" alt="下載 macOS 版"></a>
+  <a href="https://github.com/DDChen666/moqi-voice-typing/releases/tag/v1.0.0"><img src="docs/media/download.png" width="300" alt="下載 macOS 版"></a>
+  <a href="https://github.com/DDChen666/moqi-voice-typing/releases/latest"><img src="docs/media/download-windows.png" width="300" alt="下載 Windows 版"></a>
 </p>
 
 <p align="center">
@@ -20,7 +21,7 @@
 </p>
 
 <p align="center">
-  <img alt="版本 1.1.0" src="https://img.shields.io/badge/%E7%89%88%E6%9C%AC-1.1.0-0a84ff?style=flat-square">
+  <img alt="版本：Windows 1.1.0、Mac 1.0.0" src="https://img.shields.io/badge/%E7%89%88%E6%9C%AC-Windows%201.1.0%20%C2%B7%20Mac%201.0.0-0a84ff?style=flat-square">
   <img alt="macOS 15+" src="https://img.shields.io/badge/macOS-15%2B-1d1d1f?style=flat-square&logo=apple&logoColor=white">
   <img alt="Apple 晶片" src="https://img.shields.io/badge/Apple-%E6%99%B6%E7%89%87-1d1d1f?style=flat-square">
   <img alt="Windows 10、11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?style=flat-square">
@@ -72,7 +73,7 @@ https://github.com/user-attachments/assets/d8b08c03-3a8e-45ee-86c3-d20c30ad6946
 
 **Mac**
 
-1. [下載](https://github.com/DDChen666/moqi-voice-typing/releases/latest) `Moqi_1.1.0_aarch64.dmg`，把「默契」拖進「應用程式」。
+1. [下載](https://github.com/DDChen666/moqi-voice-typing/releases/tag/v1.0.0) `Moqi_1.0.0_aarch64.dmg`，把「默契」拖進「應用程式」。Mac 版目前是 1.0.0，1.1.0 的新功能之後會跟上。
 2. 第一次打開會被 macOS 擋下：默契是免費開源軟體，沒有付費取得 Apple 簽章。到「系統設定」→「隱私權與安全性」，按「**強制打開**」。
 3. 跟著畫面完成三步：允許權限、選「原話」或「整理」、試說一句。
 

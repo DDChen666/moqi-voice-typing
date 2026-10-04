@@ -4,7 +4,7 @@
 
 ## [1.1.0] — 2026-10-04
 
-支援 Windows，並加上一批 Mac 和 Windows 都有的新功能。
+支援 Windows，並加上一批新功能。這一版先發布 Windows；Mac 版目前仍是 1.0.0，下面的新功能之後會在 Mac 版跟上。
 
 ### Windows 版
 
