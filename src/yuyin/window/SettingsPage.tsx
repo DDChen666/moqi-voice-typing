@@ -837,9 +837,7 @@ export const SettingsPage: React.FC = () => {
       ? "DeepSeek"
       : service === "openrouter"
         ? "OpenRouter"
-        : service === "local"
-          ? t("moqi.settings.localModelName")
-          : serviceName(hostOf(config?.base_url ?? ""));
+        : serviceName(hostOf(config?.base_url ?? ""));
   const language =
     getSupportedLanguage(settings?.app_language) || i18n.language;
   const tapKey = tapKeyLabel(
@@ -892,7 +890,9 @@ export const SettingsPage: React.FC = () => {
           {config && level === "raw" && serviceReady && (
             <div className="flex items-center gap-3 rounded-lg bg-logo-primary/10 px-3 py-2">
               <p className="m-0 flex-1 text-[12px] leading-relaxed text-text">
-                {t("moqi.settings.rawSkips", { service: readyName })}
+                {service === "local"
+                  ? t("moqi.settings.rawSkipsLocal")
+                  : t("moqi.settings.rawSkips", { service: readyName })}
               </p>
               <SmallButton onClick={() => save({ level: "tidy" })}>
                 {t("moqi.settings.useTidy")}

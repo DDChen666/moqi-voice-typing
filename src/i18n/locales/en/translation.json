@@ -1044,7 +1044,7 @@
       "costPerThousand": "about US${{cost}} per 1,000 dictations",
       "getKey": "Get a key from {{service}}",
       "testResultTimed": "Result ({{seconds}} s): {{text}}",
-      "localModelName": "the local model",
+      "rawSkipsLocal": "The local model is set up, but “As spoken” never uses it: what you say isn't cleaned up.",
       "rawSkips": "{{service}} is set up, but “As spoken” never uses it: what you say isn't sent for clean-up.",
       "useTidy": "Switch to Tidy",
       "openrouterNotes": {
