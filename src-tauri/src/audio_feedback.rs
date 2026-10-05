@@ -9,7 +9,7 @@ use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use once_cell::sync::Lazy;
 use tauri::{AppHandle, Manager};
@@ -113,6 +113,9 @@ fn play_sound_at_path(app: &AppHandle, path: &Path) -> Result<(), Box<dyn std::e
 
 /// How long the output stream stays open after the last sound.
 const STREAM_KEEP_ALIVE: Duration = Duration::from_secs(30);
+/// How much longer than its length a sound may take before the stream is
+/// taken for dead.
+const PLAY_GRACE: Duration = Duration::from_secs(1);
 
 struct PlayRequest {
     path: PathBuf,
@@ -204,7 +207,20 @@ fn play_request(
         sound.samples.as_ref().clone(),
     ));
     if request.done.is_some() {
-        sink.sleep_until_end();
+        // Never wait longer than the sound lasts: a stream whose device went
+        // away (headphones unplugged) stops taking samples, and waiting for
+        // the sink to drain would hang this thread, silencing every sound
+        // after it until Moqi restarts. Failing here reopens the stream.
+        let frames = sound.samples.len() as f64 / f64::from(sound.channels.max(1));
+        let lasts = Duration::from_secs_f64(frames / f64::from(sound.rate.max(1)));
+        let deadline = Instant::now() + lasts + PLAY_GRACE;
+        while !sink.empty() {
+            if Instant::now() >= deadline {
+                sink.stop();
+                return Err("the output stream stopped playing".into());
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
     } else {
         sink.detach();
     }
