@@ -978,7 +978,10 @@ mod tests {
         assert!(emptied("", "繼續。"));
         // Corrections keep some of the paste.
         assert!(!emptied("打開 Supabase", "打開蘇帕貝斯"));
-        assert!(!emptied("我們下週要跟Kalopp團隊開會。", "我們下週要跟卡洛普團隊開會。"));
+        assert!(!emptied(
+            "我們下週要跟Kalopp團隊開會。",
+            "我們下週要跟卡洛普團隊開會。"
+        ));
         assert!(!emptied("請用 GitHub 登入", "請用github登入"));
     }
 
