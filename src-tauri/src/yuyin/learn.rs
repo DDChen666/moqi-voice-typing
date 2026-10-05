@@ -325,6 +325,11 @@ fn watch(pid: i32, pasted: &str, generation: u64) -> Option<String> {
             }
             // Sent (a chat box empties): the last reading is the final text.
             (Some(value), Some(_)) if value.trim().is_empty() => break,
+            (Some(value), Some(base))
+                if edited_span(base, pasted, &value).is_some_and(|span| emptied(&span, pasted)) =>
+            {
+                break
+            }
             (Some(value), Some(base)) if edited_span(base, pasted, &value).is_some() => {
                 misses = 0;
                 if latest.as_deref() != Some(value.as_str()) {
@@ -353,6 +358,24 @@ fn watch(pid: i32, pasted: &str, generation: u64) -> Option<String> {
     }
     changed_at?;
     edited_span(baseline.as_deref()?, pasted, latest.as_deref()?)
+}
+
+/// The field was emptied (sent) rather than corrected: nothing of the paste
+/// is left in its place, not one word. UI Automation reads an empty field
+/// as its placeholder or label (VS Code's Claude Code input: "Ask Claude to
+/// edit…"), so on Windows a sent chat box doesn't read as empty; taken for
+/// the user's correction, a short dictation sent at once was learned as
+/// 繼續。 → Ask Claude to edit…, and a fix made just before sending was lost.
+fn emptied(span: &str, pasted: &str) -> bool {
+    let words = |s: &str| -> Vec<String> {
+        tokenize(s)
+            .into_iter()
+            .filter(|t| t.kind != Kind::Mark)
+            .map(|t| s[t.start..t.end].to_lowercase())
+            .collect()
+    };
+    let before = words(pasted);
+    !words(span).iter().any(|w| before.contains(w))
 }
 
 /// What became of the paste: the part of `now` between the text that came
@@ -944,6 +967,19 @@ mod tests {
         assert!(pairs("明天下午三點開會", "改到禮拜五再說吧").is_empty());
         // Unchanged.
         assert!(pairs("一樣的句子", "一樣的句子").is_empty());
+    }
+
+    #[test]
+    fn a_placeholder_after_sending_is_not_a_correction() {
+        // What Windows reads in emptied fields (Claude Code in VS Code, a
+        // Chrome textarea labelled "message").
+        assert!(emptied("Ask Claude to edit…", "繼續。"));
+        assert!(emptied("message", "請通知海德蘭，明天交稿。"));
+        assert!(emptied("", "繼續。"));
+        // Corrections keep some of the paste.
+        assert!(!emptied("打開 Supabase", "打開蘇帕貝斯"));
+        assert!(!emptied("我們下週要跟Kalopp團隊開會。", "我們下週要跟卡洛普團隊開會。"));
+        assert!(!emptied("請用 GitHub 登入", "請用github登入"));
     }
 
     #[test]
