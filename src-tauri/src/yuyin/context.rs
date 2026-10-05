@@ -135,11 +135,10 @@ fn web_app(app: &FrontApp) -> Option<(Context, &'static str)> {
         .map(|(_, context, name)| (*context, *name))
 }
 
-/// What the capsule shows for a moment on key press: the web app inside a
-/// browser ("Keep"), otherwise the app's own name ("LINE").
 /// Chromium-based browsers on macOS: they expose their pages to
 /// Accessibility only when asked with `AXEnhancedUserInterface`
-/// (`session::wake_accessibility`).
+/// (`session::wake_accessibility`). Windows needs no asking.
+#[cfg(target_os = "macos")]
 const CHROMIUM_BROWSERS: &[&str] = &[
     "com.google.Chrome",
     "com.google.Chrome.beta",
@@ -152,10 +151,13 @@ const CHROMIUM_BROWSERS: &[&str] = &[
     "org.chromium.Chromium",
 ];
 
+#[cfg(target_os = "macos")]
 pub fn is_chromium_browser(bundle_id: &str) -> bool {
     CHROMIUM_BROWSERS.contains(&bundle_id)
 }
 
+/// What the capsule shows for a moment on key press: the web app inside a
+/// browser ("Keep"), otherwise the app's own name ("LINE").
 pub fn display_name(app: &FrontApp) -> String {
     match web_app(app) {
         Some((_, name)) => name.to_string(),
@@ -251,6 +253,7 @@ mod tests {
         );
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn chromium_browsers_but_not_safari_or_electron_apps() {
         assert!(is_chromium_browser("com.google.Chrome"));
