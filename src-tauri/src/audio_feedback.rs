@@ -312,8 +312,9 @@ fn play_audio_file(
     volume: f32,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Every play here is synchronous for its caller (the async ones already
-    // run on their own thread), so the start sound still ends before the
-    // microphone opens.
+    // run on their own thread), so the start sound ends before the other
+    // apps' audio is muted. It plays once the microphone has its first
+    // samples (the readiness cue in actions.rs), as in Handy.
     let Some(player) = player() else {
         return Err("feedback sound player unavailable".into());
     };
