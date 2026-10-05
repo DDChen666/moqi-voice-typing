@@ -3,6 +3,8 @@
     "settings": "设置...",
     "checkUpdates": "检查更新...",
     "copyLastTranscript": "复制最新转录",
+    "pasteLastTranscript": "粘贴上一次",
+    "correctLast": "修正上一次…",
     "unloadModel": "卸载模型",
     "model": "模型",
     "quit": "退出",
