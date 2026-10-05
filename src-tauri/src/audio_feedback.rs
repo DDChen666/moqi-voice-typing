@@ -133,6 +133,24 @@ struct Decoded {
     samples: Arc<Vec<f32>>,
 }
 
+/// The output stream kept open between sounds.
+struct OpenStream {
+    /// The device asked for (None or "Default": the system's default output).
+    device: Option<String>,
+    /// For the default output, the device that was when the stream opened.
+    default_name: Option<String>,
+    output: rodio::OutputStream,
+}
+
+fn follows_default(device: &Option<String>) -> bool {
+    matches!(device.as_deref(), None | Some("Default"))
+}
+
+/// The system's default output device, as rodio's default stream opens it.
+fn default_output_name() -> Option<String> {
+    cpal::default_host().default_output_device()?.name().ok()
+}
+
 static PLAYER: Lazy<Mutex<Option<mpsc::Sender<PlayRequest>>>> = Lazy::new(|| Mutex::new(None));
 
 fn player() -> Option<mpsc::Sender<PlayRequest>> {
@@ -152,7 +170,7 @@ fn player() -> Option<mpsc::Sender<PlayRequest>> {
 }
 
 fn run_player(rx: mpsc::Receiver<PlayRequest>) {
-    let mut stream: Option<(Option<String>, rodio::OutputStream)> = None;
+    let mut stream: Option<OpenStream> = None;
     let mut decoded: HashMap<PathBuf, Decoded> = HashMap::new();
     loop {
         let request = match rx.recv_timeout(STREAM_KEEP_ALIVE) {
@@ -179,16 +197,30 @@ fn run_player(rx: mpsc::Receiver<PlayRequest>) {
 
 fn play_request(
     request: &PlayRequest,
-    stream: &mut Option<(Option<String>, rodio::OutputStream)>,
+    stream: &mut Option<OpenStream>,
     decoded: &mut HashMap<PathBuf, Decoded>,
 ) -> Result<(), String> {
-    if stream.as_ref().map(|(device, _)| device) != Some(&request.device) {
+    // The system's default output may have changed since the stream was
+    // opened (headphones plugged in): sounds go where the system's do.
+    let default_name = if follows_default(&request.device) {
+        default_output_name()
+    } else {
+        None
+    };
+    let current = stream
+        .as_ref()
+        .is_some_and(|s| s.device == request.device && s.default_name == default_name);
+    if !current {
         *stream = None;
         let builder = output_stream_builder(request.device.clone()).map_err(|e| e.to_string())?;
         let opened = builder.open_stream().map_err(|e| e.to_string())?;
-        *stream = Some((request.device.clone(), opened));
+        *stream = Some(OpenStream {
+            device: request.device.clone(),
+            default_name,
+            output: opened,
+        });
     }
-    let Some((_, output)) = stream.as_ref() else {
+    let Some(OpenStream { output, .. }) = stream.as_ref() else {
         return Err("no output stream".into());
     };
     let sound = match decoded.get(&request.path) {
