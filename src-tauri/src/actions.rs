@@ -849,6 +849,10 @@ impl ShortcutAction for TranscribeAction {
                                         handy_post_process,
                                     )
                                     .await;
+                                    // Yuyin fork: the recognizer's spacing (S E O → SEO)
+                                    // and 嗎。 → 嗎？, before history and the clean-up.
+                                    processed.final_text =
+                                        crate::yuyin::spacing::tidy(&processed.final_text);
                                     // Yuyin fork: history's 原話 is the Traditional
                                     // Chinese text before clean-up, not the engine's
                                     // Simplified output.
@@ -876,7 +880,9 @@ impl ShortcutAction for TranscribeAction {
                                             crate::yuyin::learn::apply(&ah, &processed.final_text);
                                         let polished =
                                             crate::yuyin::polish::polish(&ah, &corrected).await;
-                                        let polished = crate::yuyin::learn::apply(&ah, &polished);
+                                        let polished = crate::yuyin::spacing::tidy(
+                                            &crate::yuyin::learn::apply(&ah, &polished),
+                                        );
                                         // Yuyin fork: dictionary words just heard stay
                                         // among the recognizer's (yuyin/asr_vocab.rs).
                                         crate::yuyin::asr_vocab::note_output(&ah, &polished);

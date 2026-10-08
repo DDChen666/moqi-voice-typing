@@ -396,7 +396,12 @@ fn wait_for_pieces(generation: u64) -> Option<Vec<String>> {
 /// `tools/chunk_eval.py`).
 fn join(parts: &[String]) -> String {
     let mut out = String::new();
-    for part in parts.iter().map(|p| p.trim()).filter(|p| !p.is_empty()) {
+    // A piece that ends 吗。 ends a question: keep it one (吗？), not ，.
+    let parts: Vec<String> = parts
+        .iter()
+        .map(|p| super::spacing::question_marks(p.trim()))
+        .collect();
+    for part in parts.iter().map(String::as_str).filter(|p| !p.is_empty()) {
         if out.ends_with('。') {
             out.pop();
             out.push('，');
@@ -445,6 +450,14 @@ mod tests {
             "Run the tests. Then commit."
         );
         assert_eq!(join(&s(&["用 React", "寫"])), "用 React寫");
+    }
+
+    #[test]
+    fn a_question_at_a_cut_keeps_its_question_mark() {
+        assert_eq!(
+            join(&s(&["可以传到你那边吗。", "我想确认"])),
+            "可以传到你那边吗？我想确认"
+        );
     }
 
     #[test]

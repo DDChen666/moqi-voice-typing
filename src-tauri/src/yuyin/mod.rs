@@ -34,6 +34,7 @@ pub mod replay;
 pub mod secrets;
 pub mod session;
 pub mod snippets;
+pub mod spacing;
 pub mod stats;
 pub mod sync;
 pub mod warmup;
