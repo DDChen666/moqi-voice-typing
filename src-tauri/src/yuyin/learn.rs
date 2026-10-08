@@ -79,10 +79,18 @@ pub struct Rule {
     pub changed: f64,
 }
 
+/// Bumped when what counts as a misheard word changes: rules learned under
+/// looser criteria are checked again once (see [`recheck`]).
+/// 2 (2026-10-08): an English term must sound like what was typed for it.
+const CRITERIA: u32 = 2;
+
 #[derive(Default, Serialize, Deserialize)]
 struct Store {
     #[serde(default)]
     rules: Vec<Rule>,
+    /// The [`CRITERIA`] the rules were last checked against.
+    #[serde(default)]
+    criteria: u32,
 }
 
 static STORE: Lazy<RwLock<Option<Store>>> = Lazy::new(|| RwLock::new(None));
@@ -100,8 +108,16 @@ fn with_store<T>(app: &AppHandle, f: impl FnOnce(&mut Store) -> (T, bool)) -> T 
             .and_then(|s| serde_json::from_str(&s).ok())
             .unwrap_or_default()
     });
+    let rechecked = store.criteria < CRITERIA;
+    if rechecked {
+        let off = recheck(store, now_ms());
+        if off > 0 {
+            debug!("learn: {off} correction(s) learned under looser criteria are off now");
+        }
+        store.criteria = CRITERIA;
+    }
     let (result, changed) = f(store);
-    if changed {
+    if changed || rechecked {
         if let Some(path) = store_path(app) {
             let written = serde_json::to_string_pretty(&*store)
                 .map_err(|e| e.to_string())
@@ -152,9 +168,7 @@ fn apply_by_sound(text: &str, rules: &[(String, String)]) -> String {
     let by_sound: Vec<(Vec<Vec<String>>, &str)> = rules
         .iter()
         .filter(|(from, to)| {
-            to.chars().any(|c| c.is_ascii_alphabetic())
-                && from.chars().count() >= 2
-                && from.chars().all(is_han)
+            is_english(to) && from.chars().count() >= 2 && from.chars().all(is_han)
         })
         .filter_map(|(from, to)| syllables(from).map(|s| (s, to.as_str())))
         .collect();
@@ -727,9 +741,167 @@ fn add_to_dictionary(app: &AppHandle, words: &[String]) {
     super::asr_vocab::touch(app, words);
 }
 
-/// A misheard word rather than a reworded one (see the module docs).
+/// A misheard word rather than a reworded one (see the module docs). A fix
+/// to an English term must sound like what was typed for it, and what was
+/// typed must be long enough to replace everywhere: learned at once, 付費 →
+/// grok (the user rewrote that part) turned every later 付費 into grok, and
+/// S → x every S. Those now need making twice, like any rewording.
 fn misheard(from: &str, to: &str) -> bool {
-    to.chars().any(|c| c.is_ascii_alphabetic()) || sounds_alike(from, to)
+    if is_english(to) {
+        same_letters(from, to) || (long_enough(from) && sounds_like_spelling(from, to))
+    } else {
+        sounds_alike(from, to)
+    }
+}
+
+/// Stop applying the rules that were learned at once but would now need
+/// making twice. They stay on the dictionary page, off, and can be turned
+/// back on there. Returns how many were turned off.
+fn recheck(store: &mut Store, now: f64) -> usize {
+    let mut off = 0;
+    for rule in store.rules.iter_mut().filter(|r| r.active && !r.dismissed) {
+        if rule.count < times_needed(&rule.from, &rule.to) {
+            rule.active = false;
+            rule.changed = now;
+            off += 1;
+        }
+    }
+    off
+}
+
+/// An English term: Latin letters, no Chinese ("OK 啦" is a rewording).
+fn is_english(word: &str) -> bool {
+    word.chars().any(|c| c.is_ascii_alphabetic()) && !word.chars().any(is_han)
+}
+
+/// Safe to replace wherever it appears: two Chinese characters or three
+/// letters. One letter or a two-letter word (S, So) is part of too much.
+fn long_enough(from: &str) -> bool {
+    from.chars().filter(|&c| is_han(c)).count() >= 2
+        || from.chars().filter(|c| c.is_ascii_alphabetic()).count() >= 3
+}
+
+/// Only the spacing or the capitals differ (A I → AI, V3 → v3).
+fn same_letters(from: &str, to: &str) -> bool {
+    let letters = |s: &str| -> String {
+        s.chars()
+            .filter(|c| c.is_ascii_alphanumeric())
+            .map(|c| c.to_ascii_lowercase())
+            .collect()
+    };
+    let typed = letters(from);
+    !typed.is_empty() && !from.chars().any(is_han) && typed == letters(to)
+}
+
+/// Whether an English term sounds like what the recognizer wrote for it, in
+/// Chinese (蘇帕貝斯 → Supabase, 過客 → grok) or English (Cloud → Claude):
+/// their consonants, grouped the way Mandarin hears English (b/p, d/t, g/k,
+/// l/n/r, s/z/sh/j/x…), start the same and differ in at most half the places.
+fn sounds_like_spelling(from: &str, to: &str) -> bool {
+    let (a, b) = (consonants(from), consonants(to));
+    match (a.first(), b.first()) {
+        (Some(x), Some(y)) if x == y => edit_distance(&a, &b) * 2 <= a.len().max(b.len()),
+        _ => false,
+    }
+}
+
+/// The consonant classes of `s` (see [`sounds_like_spelling`]): P F M N T K S.
+fn consonants(s: &str) -> Vec<char> {
+    use pinyin::ToPinyin;
+    let mut out = Vec::new();
+    let mut word = String::new();
+    for c in s.chars().chain(std::iter::once(' ')) {
+        if c.is_ascii_alphabetic() {
+            word.push(c.to_ascii_lowercase());
+            continue;
+        }
+        if !word.is_empty() {
+            out.extend(english_consonants(&word));
+            word.clear();
+        }
+        if let Some(reading) = c.to_pinyin() {
+            out.extend(pinyin_consonants(reading.plain()));
+        }
+    }
+    out
+}
+
+fn english_consonants(word: &str) -> Vec<char> {
+    let mut letters: Vec<char> = word.chars().collect();
+    letters.dedup(); // a doubled letter is one sound (Kalopp, Typeless)
+    let vowel = |c: Option<&char>| matches!(c, Some('a' | 'e' | 'i' | 'o' | 'u' | 'y'));
+    let mut out = Vec::new();
+    for (i, &c) in letters.iter().enumerate() {
+        let next = letters.get(i + 1);
+        let soft = matches!(next, Some('e' | 'i' | 'y'));
+        let class = match c {
+            'b' | 'p' => "P",
+            'f' => "F",
+            'm' => "M",
+            'n' | 'l' | 'r' => "N",
+            'd' | 't' => "T",
+            'k' | 'q' => "K",
+            // The g of -ng (timing) is part of the n.
+            'g' if i > 0 && letters[i - 1] == 'n' && !vowel(next) => "",
+            'c' | 'g' if soft => "S",
+            'c' if next == Some(&'h') => "S",
+            'c' | 'g' => "K",
+            'x' => "KS",
+            'j' | 's' | 'z' => "S",
+            // Vowels, and h w v y: Mandarin hears them as vowels or not at all.
+            _ => "",
+        };
+        out.extend(class.chars());
+    }
+    out
+}
+
+/// One toneless pinyin syllable: its initial, and a final -n/-ng (or er).
+fn pinyin_consonants(syllable: &str) -> Vec<char> {
+    let (initial, rest) = match ["zh", "ch", "sh"]
+        .iter()
+        .find_map(|p| syllable.strip_prefix(p))
+    {
+        Some(rest) => ("S", rest),
+        None => {
+            let mut chars = syllable.chars();
+            let class = match chars.next() {
+                Some('b' | 'p') => "P",
+                Some('f') => "F",
+                Some('m') => "M",
+                Some('d' | 't') => "T",
+                Some('n' | 'l' | 'r') => "N",
+                Some('g' | 'k') => "K",
+                Some('j' | 'q' | 'x' | 'z' | 'c' | 's') => "S",
+                Some('h' | 'y' | 'w') => "",
+                _ => {
+                    chars = syllable.chars(); // starts with its vowel
+                    ""
+                }
+            };
+            (class, chars.as_str())
+        }
+    };
+    let final_n = rest.ends_with('n') || rest.ends_with("ng") || rest == "er";
+    initial.chars().chain(final_n.then_some('N')).collect()
+}
+
+fn edit_distance(a: &[char], b: &[char]) -> usize {
+    let mut row: Vec<usize> = (0..=b.len()).collect();
+    for (i, x) in a.iter().enumerate() {
+        let mut diagonal = row[0];
+        row[0] = i + 1;
+        for (j, y) in b.iter().enumerate() {
+            let above = row[j + 1];
+            row[j + 1] = if x == y {
+                diagonal
+            } else {
+                1 + diagonal.min(above).min(row[j])
+            };
+            diagonal = above;
+        }
+    }
+    row[b.len()]
 }
 
 /// How many times a correction must be seen before it is applied.
@@ -1059,6 +1231,88 @@ mod tests {
         let reworded = vec![pair("但是", "可是")];
         assert!(learn_into(&mut store, &reworded, 2.0, true).is_empty());
         assert_eq!(learn_into(&mut store, &reworded, 3.0, true), reworded);
+    }
+
+    #[test]
+    fn an_english_fix_counts_as_misheard_only_if_it_sounds_like_the_typo() {
+        // Taught or seen in the user's own corrections and the M0 replay.
+        for (from, to) in [
+            ("蘇帕貝斯", "Supabase"),
+            ("Superbase", "Supabase"),
+            ("過客", "grok"),
+            ("深拓", "Zentro"),
+            ("卡洛普", "Kalopp"),
+            ("Cloud", "Claude"),
+            ("Cloud Code", "Claude Code"),
+            ("迷音", "meme"),
+            ("他們也", "timing"),
+            ("report", "repo"),
+            ("web", "vibe"),
+            ("Gomora", "Gumroad"),
+            ("Type Plus", "Typeless"),
+            ("Make", "mac"),
+            ("過客，bot", "grokbot"),
+            ("A I", "AI"),
+            ("V3", "v3"),
+        ] {
+            assert!(misheard(from, to), "{from} -> {to}");
+        }
+        // Learned at once before 2026-10-08, and wrong everywhere after.
+        for (from, to) in [
+            ("付費", "grok"),
+            ("S", "x"),
+            ("So", "sol"),
+            ("Google Bard", "bot"),
+            ("的購", "的go"),
+            ("SJS", "Next.js"),
+            ("O K 了", "OK 啦"),
+        ] {
+            assert!(!misheard(from, to), "{from} -> {to}");
+            assert_eq!(times_needed(from, to), TIMES_TO_LEARN, "{from} -> {to}");
+        }
+    }
+
+    #[test]
+    fn rules_learned_under_looser_criteria_are_turned_off_once() {
+        let rule = |from: &str, to: &str| Rule {
+            from: from.into(),
+            to: to.into(),
+            count: 1,
+            active: true,
+            dismissed: false,
+            last_seen: 1.0,
+            changed: 1.0,
+        };
+        let mut store = Store {
+            rules: vec![rule("付費", "grok"), rule("過客", "grok"), rule("S", "x")],
+            criteria: 0,
+        };
+        assert_eq!(recheck(&mut store, 5.0), 2);
+        let active: Vec<&str> = store
+            .rules
+            .iter()
+            .filter(|r| r.active)
+            .map(|r| r.from.as_str())
+            .collect();
+        assert_eq!(active, vec!["過客"]);
+        // Off, not removed: the dictionary page can turn them back on.
+        assert!(store.rules.iter().all(|r| !r.dismissed));
+        assert_eq!(store.rules[0].changed, 5.0);
+        // A correction made twice stays on.
+        let mut twice = Store {
+            rules: vec![Rule {
+                count: 2,
+                ..rule("付費", "grok")
+            }],
+            criteria: 0,
+        };
+        assert_eq!(recheck(&mut twice, 5.0), 0);
+    }
+
+    #[test]
+    fn a_half_english_fix_is_not_applied_by_sound() {
+        let rules = vec![pair("的購", "的go")];
+        assert_eq!(apply_by_sound("做得夠好", &rules), "做得夠好");
     }
 
     #[test]
