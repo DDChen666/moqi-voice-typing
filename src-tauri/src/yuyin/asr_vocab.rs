@@ -85,7 +85,7 @@ fn prepare(words: impl IntoIterator<Item = String>) -> Vec<String> {
         } else {
             simplified(word.trim())
         };
-        if !word.is_empty() && !out.contains(&word) {
+        if !word.is_empty() && listenable(&word) && !out.contains(&word) {
             out.push(word);
         }
         if out.len() == MAX_WORDS {
@@ -93,6 +93,73 @@ fn prepare(words: impl IntoIterator<Item = String>) -> Vec<String> {
         }
     }
     out
+}
+
+/// Worth listening for. A lone letter ("x") makes the recognizer write it
+/// for any short syllable, and a word half Chinese, half English ("的go",
+/// learned from one changed character) is no term at all. Both stay in the
+/// dictionary for the clean-up; only the recognizer doesn't get them.
+fn listenable(word: &str) -> bool {
+    let latin = word.chars().filter(|c| c.is_ascii_alphabetic()).count();
+    let han = word.chars().any(is_han);
+    let lone_letter = latin == 1 && word.chars().count() == 1;
+    !lone_letter && !(han && latin > 0)
+}
+
+fn is_han(c: char) -> bool {
+    ('\u{4e00}'..='\u{9fff}').contains(&c) || ('\u{3400}'..='\u{4dbf}').contains(&c)
+}
+
+/// Dictionary words in a row (nothing but spaces or punctuation between
+/// them) that mean the recognizer recited its list instead of transcribing.
+const RECITED_RUN: usize = 6;
+
+/// Whether the recognizer recited `vocabulary` (the words it was given)
+/// instead of the speech. Seen on 2026-10-08: 8 s of speech came back as
+/// "首先 Grokbot bot grok x 视窗 Claude Claude Code LINE …", all 50 words in
+/// the order given, and was pasted like that. People name a few terms in a
+/// row ("React、Rust、Python"), but not six with nothing else between them.
+pub fn recited(text: &str, vocabulary: &[String]) -> bool {
+    longest_run(text, vocabulary) >= RECITED_RUN
+}
+
+/// The longest run of dictionary words in `text`, matching whole words
+/// (not "bot" inside "robot") and the longest word at each place
+/// ("Claude Code" over "Claude"), ignoring case.
+fn longest_run(text: &str, vocabulary: &[String]) -> usize {
+    let lower = |s: &str| -> Vec<char> { s.chars().flat_map(char::to_lowercase).collect() };
+    let text = lower(text);
+    let words: Vec<Vec<char>> = vocabulary
+        .iter()
+        .map(|w| lower(w.trim()))
+        .filter(|w| !w.is_empty())
+        .collect();
+    let alnum = |c: Option<&char>| c.is_some_and(|c| c.is_ascii_alphanumeric());
+    let fits = |at: usize, word: &[char]| {
+        text.get(at..at + word.len()) == Some(word)
+            && !(word[0].is_ascii_alphanumeric() && at > 0 && alnum(text.get(at - 1)))
+            && !(word[word.len() - 1].is_ascii_alphanumeric() && alnum(text.get(at + word.len())))
+    };
+    let (mut best, mut run, mut i) = (0, 0, 0);
+    while i < text.len() {
+        let c = text[i];
+        if c.is_whitespace() || (!c.is_alphanumeric() && !is_han(c)) {
+            i += 1;
+            continue;
+        }
+        match words.iter().filter(|w| fits(i, w)).map(Vec::len).max() {
+            Some(len) => {
+                run += 1;
+                best = best.max(run);
+                i += len;
+            }
+            None => {
+                run = 0;
+                i += 1;
+            }
+        }
+    }
+    best
 }
 
 fn simplified(word: &str) -> String {
@@ -186,6 +253,66 @@ mod tests {
         assert_eq!(words.len(), MAX_WORDS);
         assert_eq!(words[0], "w0");
         assert_eq!(prepare(s(&["", "  ", "API", "API"])), s(&["API"]));
+    }
+
+    #[test]
+    fn lone_letters_and_half_chinese_words_are_not_listened_for() {
+        assert_eq!(
+            prepare(s(&["x", "X", "的go", "AI", "grok", "C++", "視窗", "3D"])),
+            s(&["AI", "grok", "C++", "视窗", "3D"])
+        );
+    }
+
+    #[test]
+    fn a_recited_dictionary_is_caught() {
+        // The 2026-10-08 dictation, exactly as the recognizer returned it.
+        let vocab = s(&[
+            "Grokbot",
+            "bot",
+            "grok",
+            "x",
+            "视窗",
+            "Claude",
+            "Claude Code",
+            "LINE",
+            "patreon",
+            "YouTube",
+            "Patreon",
+            "Discord",
+            "pixiv",
+            "sol",
+            "Gemini",
+            "ChatGPT",
+        ]);
+        let out = "首先 Grokbot bot grok x 视窗 Claude Claude Code LINE patreon YouTube \
+                   Patreon Discord pixiv sol Gemini ChatGPT";
+        assert!(recited(out, &vocab));
+        // After some real speech too.
+        assert!(recited(&format!("我跟你确认一下，{out}"), &vocab));
+    }
+
+    #[test]
+    fn naming_a_few_terms_is_not_reciting() {
+        let vocab = s(&[
+            "React",
+            "Rust",
+            "Python",
+            "Tauri",
+            "Claude",
+            "Claude Code",
+            "bot",
+        ]);
+        assert!(!recited("用 React、Rust、Python、Tauri 写一个 App", &vocab));
+        assert!(!recited(
+            "我要让 Claude Code 跟 Grokbot 那边建立流程",
+            &vocab
+        ));
+        // Whole words only: "bot" in "robot" is not the dictionary's "bot".
+        assert_eq!(
+            longest_run("robot robot robot robot robot robot", &vocab),
+            0
+        );
+        assert_eq!(longest_run("Claude Claude Code bot", &vocab), 3);
     }
 
     #[test]

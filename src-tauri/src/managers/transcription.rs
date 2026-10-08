@@ -1371,10 +1371,28 @@ impl TranscriptionManager {
                         // words, which transcribe-cpp stops as an error. Never lose
                         // the dictation to that: run again without the dictionary,
                         // and failing that keep what was recognized before the loop.
+                        // It can also recite the dictionary instead of the speech,
+                        // or return nothing for a second of speech or more: run
+                        // again without it then too.
                         let mut result = session.run(&audio, &run_options);
-                        if let Err(e) = &result {
-                            if !run_options.vocabulary.is_empty() {
-                                warn!("recognition with the dictionary failed ({e}); retrying without it");
+                        if !run_options.vocabulary.is_empty() {
+                            let retry = match &result {
+                                Err(e) => Some(format!("failed ({e})")),
+                                Ok(t)
+                                    if crate::yuyin::asr_vocab::recited(
+                                        &t.text,
+                                        &run_options.vocabulary,
+                                    ) =>
+                                {
+                                    Some("recited the dictionary".to_string())
+                                }
+                                Ok(t) if t.text.trim().is_empty() && audio.len() >= 16_000 => {
+                                    Some("returned nothing".to_string())
+                                }
+                                Ok(_) => None,
+                            };
+                            if let Some(why) = retry {
+                                warn!("recognition with the dictionary {why}; retrying without it");
                                 let plain = RunOptions {
                                     vocabulary: Vec::new(),
                                     ..run_options.clone()
