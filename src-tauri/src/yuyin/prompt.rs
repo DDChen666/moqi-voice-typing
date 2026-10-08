@@ -38,10 +38,11 @@ const WORDING_POLISH: &str = "## 用字
 用繁體中文字。使用者自己慣用的詞（例如「軟件」）保持原樣，不要換成別的說法。";
 
 const LEVEL_TIDY: &str = "## 處理程度：整理
-- 去掉贅字（嗯、呃、那個、就是說）和沒有意義的重複。
+- 去掉贅字（嗯、呃、那個、就是說）和沒有意義的重複。句尾的「嗎」「呢」「吧」帶著語氣，不是贅字，要保留。
 - 使用者講錯後改口時，只保留最後的說法。
 - 數字、日期、金額、百分比改成阿拉伯數字。
 - 口頭列點（第一、第二…）變成清單。
+- 標點照語氣：在問對方的句子用問號，辨識結果常把問句寫成句號或逗號（例如「明天幾點開會。」應該是「明天幾點開會？」）。問句後面還接著別的話，也用問號隔開（「那個檔案在哪，我找半天了」→「那個檔案在哪？我找半天了」）。句子裡只是提到一個問題、沒有在問對方的，照原樣用句號（例如「我還沒想好要用哪個。」）。改標點時只換符號，不要因此刪字或併句。
 - 不重組句子，不加入原本沒有的內容。";
 
 // Not part of the M0 evaluation yet — the Polish level is new in M1.
@@ -49,11 +50,12 @@ const LEVEL_POLISH: &str = "## 處理程度：潤飾
 - 把口語重組成通順的書面文字，讀起來像寫的，不像說的。
 - 去掉贅字、重複，講錯後改口時只保留最後的說法。
 - 數字、日期、金額、百分比改成阿拉伯數字；口頭列點變成清單。
+- 在問對方的句子用問號，辨識結果常把問句寫成句號或逗號；只是提到一個問題、沒有在問對方的，用句號。
 - 意思、事實、數字、英文詞、檔名都不能改，也不能加入原本沒有的內容。";
 
 fn context_rule(context: Context) -> &'static str {
     match context {
-        Context::Chat => "使用者正在聊天軟體（LINE、Messenger）傳訊息。保留口語和原本的語氣詞，不要自己加或換語氣詞；用逗號、問號、驚嘆號斷句，不要用空格代替標點；最後一句不加句號；不分段；結尾不加換行。",
+        Context::Chat => "使用者正在聊天軟體（LINE、Messenger）傳訊息。保留口語和原本的語氣詞，不要自己加或換語氣詞；用逗號、問號、驚嘆號斷句，不要用空格代替標點；最後一句不加句號，但問句的問號要留著；不分段；結尾不加換行。",
         Context::ToAi => "使用者正在對 AI 下指令（Claude Code、ChatGPT）。一個細節都不能少；英文、檔名、路徑、指令照原樣；不加客套話。",
         Context::Notes => "使用者正在記筆記（Keep）。精簡、條列，去掉口語的連接詞，但每一項的內容都要保留。",
         Context::Other => "一般文字。用標準標點。",
@@ -186,12 +188,15 @@ mod tests {
         assert!(!p.contains("口語不要改成書面語"));
     }
 
-    /// The app must send exactly the prompt the M0 evaluation measured.
-    /// Fixtures are generated from `M0_引擎盲測/eval/polish_eval.py` (V3) with
-    /// the eval's vocab.txt (copied to testdata); regenerate them when the
-    /// eval prompt changes.
+    /// The app must send exactly the prompt that was measured. v3 came from
+    /// `M0_引擎盲測/eval/polish_eval.py` with the eval's vocab.txt (copied to
+    /// testdata). v4 (2026-10-08) adds the question-mark rules, measured with
+    /// `M0_引擎盲測/eval/punct_eval.py` on these fixtures: questions marked
+    /// 17–18 → 25 of 25 (to AI) and 6–7 → 24–25 of 25 (chat), statements
+    /// left alone 15/15 (chat 14/15), the 30 M0 clips unchanged in meaning.
+    /// Regenerate the fixtures when the prompt changes.
     #[test]
-    fn matches_the_evaluated_prompt_v3() {
+    fn matches_the_evaluated_prompt_v4() {
         let vocab: Vec<String> = include_str!("testdata/eval_vocab.txt")
             .lines()
             .map(str::trim)
@@ -199,9 +204,9 @@ mod tests {
             .map(String::from)
             .collect();
         let to_ai = system_prompt(Level::Tidy, Context::ToAi, &vocab).unwrap();
-        assert_eq!(to_ai, include_str!("testdata/prompt_v3_tidy_to_ai.txt"));
+        assert_eq!(to_ai, include_str!("testdata/prompt_v4_tidy_to_ai.txt"));
         let chat = system_prompt(Level::Tidy, Context::Chat, &vocab).unwrap();
-        assert_eq!(chat, include_str!("testdata/prompt_v3_tidy_chat.txt"));
+        assert_eq!(chat, include_str!("testdata/prompt_v4_tidy_chat.txt"));
     }
 
     #[test]

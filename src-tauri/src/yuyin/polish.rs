@@ -1,5 +1,5 @@
 //! LLM clean-up of a transcript, set up the way the M0 evaluation validated:
-//! DeepSeek flash with reasoning off, temperature 0, prompt v3 as the system
+//! DeepSeek flash with reasoning off, temperature 0, prompt v4 as the system
 //! message and the transcript fenced in the user message.
 //!
 //! Never loses a draft: any failure returns the raw transcript, and the caller
