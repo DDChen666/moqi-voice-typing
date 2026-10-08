@@ -289,6 +289,30 @@ mod tests {
         assert!(recited(out, &vocab));
         // After some real speech too.
         assert!(recited(&format!("我跟你确认一下，{out}"), &vocab));
+        // The same afternoon, in another order. The words given to the
+        // recognizer by then had no lone letters or half-Chinese words, so
+        // "x" and "的 go" break the run here; what follows still counts.
+        let vocab = s(&[
+            "Grokbot",
+            "bot",
+            "Grok",
+            "Claude",
+            "sol",
+            "mac",
+            "Graphtreon",
+            "patreon",
+            "pixiv",
+            "danbooru",
+            "Bilibili",
+            "YouTube",
+            "Notion",
+            "Keep",
+            "Messenger",
+            "LINE",
+        ]);
+        let out = "那关于 Grokbot bot Grok Claude x sol 的 go mac Graphtreon patreon pixiv \
+                   danbooru Bilibili YouTube Notion Keep Messenger LINE";
+        assert!(recited(out, &vocab));
     }
 
     #[test]
