@@ -79,18 +79,24 @@ pub struct Rule {
     pub changed: f64,
 }
 
-/// Bumped when what counts as a misheard word changes: rules learned under
-/// looser criteria are checked again once (see [`recheck`]).
-/// 2 (2026-10-08): an English term must sound like what was typed for it.
-const CRITERIA: u32 = 2;
+/// Bumped when the store needs a one-time update on loading.
+/// 2 (2026-10-08): an English term must sound like what was typed for it;
+/// rules learned under looser criteria are checked again (see [`recheck`]).
+/// 3 (2026-10-08): which dictionary words learning added is recorded; for
+/// the words from before, it is inferred (see [`infer_learned_words`]).
+const CRITERIA: u32 = 3;
 
 #[derive(Default, Serialize, Deserialize)]
 struct Store {
     #[serde(default)]
     rules: Vec<Rule>,
-    /// The [`CRITERIA`] the rules were last checked against.
+    /// The [`CRITERIA`] the store was last updated to.
     #[serde(default)]
     criteria: u32,
+    /// Dictionary words that learning added, not the user. Only these ever
+    /// leave the dictionary on their own (see [`tidy`]).
+    #[serde(default)]
+    words: Vec<String>,
 }
 
 static STORE: Lazy<RwLock<Option<Store>>> = Lazy::new(|| RwLock::new(None));
@@ -109,13 +115,16 @@ fn with_store<T>(app: &AppHandle, f: impl FnOnce(&mut Store) -> (T, bool)) -> T 
             .unwrap_or_default()
     });
     let rechecked = store.criteria < CRITERIA;
-    if rechecked {
+    if store.criteria < 2 {
         let off = recheck(store, now_ms());
         if off > 0 {
             debug!("learn: {off} correction(s) learned under looser criteria are off now");
         }
-        store.criteria = CRITERIA;
     }
+    if store.criteria < 3 {
+        store.words = infer_learned_words(&config::get(app).vocab, &store.rules);
+    }
+    store.criteria = CRITERIA;
     let (result, changed) = f(store);
     if changed || rechecked {
         if let Some(path) = store_path(app) {
@@ -606,6 +615,8 @@ fn record(app: &AppHandle, found: &[(String, String)]) {
     });
     super::sync::changed();
     add_to_dictionary(app, &dictionary_words(&learned));
+    // A correction changed back may have taken its word's reason away.
+    tidy_dictionary(app);
 }
 
 /// The corrected words worth a dictionary entry: misheard terms only, so a
@@ -659,6 +670,7 @@ pub fn teach(app: &AppHandle, before: &str, heard: &str, after: &str) -> Taught 
     super::sync::changed();
     let words = dictionary_words(&active);
     add_to_dictionary(app, &words);
+    tidy_dictionary(app);
     debug!(
         "learn: taught {} correction(s), {} applied now",
         found.len(),
@@ -726,19 +738,145 @@ fn add_to_dictionary(app: &AppHandle, words: &[String]) {
         return;
     }
     let mut cfg = config::get(app);
-    let mut added = false;
+    let mut added = Vec::new();
     for word in words {
         if !cfg.vocab.iter().any(|w| w.eq_ignore_ascii_case(word)) {
             cfg.vocab.push(word.clone());
-            added = true;
+            added.push(word.clone());
         }
     }
-    if added {
+    if !added.is_empty() {
         if let Err(e) = config::set(app, cfg) {
             warn!("Failed to add a learned word to the dictionary: {e}");
         }
+        // Remembered as learning's, so it can leave again (see `tidy`). A word
+        // the user already had is theirs and stays theirs.
+        with_store(app, |store| {
+            for word in added {
+                if !store.words.iter().any(|w| w.eq_ignore_ascii_case(&word)) {
+                    store.words.push(word);
+                }
+            }
+            ((), true)
+        });
     }
     super::asr_vocab::touch(app, words);
+}
+
+/// Keep the dictionary in step with what was learned (see [`tidy`]). Called
+/// whenever corrections or the dictionary change, and at launch.
+pub fn tidy_dictionary(app: &AppHandle) {
+    let mut cfg = config::get(app);
+    let outcome = with_store(app, |store| {
+        let outcome = tidy(store, &cfg.vocab, now_ms());
+        let changed = outcome.changed;
+        (outcome, changed)
+    });
+    let changed = outcome.changed;
+    if !outcome.drop.is_empty() {
+        cfg.vocab.retain(|w| {
+            !outcome
+                .drop
+                .iter()
+                .any(|d| d.eq_ignore_ascii_case(w.trim()))
+        });
+        if let Err(e) = config::set(app, cfg) {
+            warn!("Failed to take learned words out of the dictionary: {e}");
+        }
+    }
+    if changed {
+        debug!(
+            "learn: {} learned word(s) left the dictionary, {} correction(s) stopped with the words the user removed",
+            outcome.drop.len(),
+            outcome.rules_off
+        );
+        super::sync::changed();
+    }
+}
+
+/// What [`tidy`] did.
+#[derive(Debug, Default, PartialEq)]
+struct Tidied {
+    /// Learned words to take out of the dictionary.
+    drop: Vec<String>,
+    /// Corrections stopped because the user removed the word they write.
+    rules_off: usize,
+    changed: bool,
+}
+
+/// A word learning added is in the dictionary only for the corrections that
+/// write it, so:
+/// - when none of them is in use any more (turned off by [`recheck`],
+///   changed back by the user, or turned off on the dictionary page), the
+///   word leaves the dictionary, and stops pulling the recognizer toward it;
+/// - when the user takes the word out of the dictionary themselves, the
+///   corrections that write it stop, for good ("sol" removed also stops
+///   Sonnet → sol).
+///
+/// Words the user added are never touched.
+fn tidy(store: &mut Store, vocab: &[String], now: f64) -> Tidied {
+    let in_vocab = |word: &str| {
+        vocab
+            .iter()
+            .any(|v| v.trim().eq_ignore_ascii_case(word.trim()))
+    };
+    let mut out = Tidied::default();
+
+    let removed: Vec<String> = store
+        .words
+        .iter()
+        .filter(|w| !in_vocab(w))
+        .cloned()
+        .collect();
+    if !removed.is_empty() {
+        for rule in store.rules.iter_mut().filter(|r| !r.dismissed) {
+            if removed
+                .iter()
+                .any(|w| w.trim().eq_ignore_ascii_case(rule.to.trim()))
+            {
+                rule.active = false;
+                rule.dismissed = true;
+                rule.changed = now;
+                out.rules_off += 1;
+            }
+        }
+        store.words.retain(|w| in_vocab(w));
+        out.changed = true;
+    }
+
+    let rules = &store.rules;
+    let in_use = |word: &str| {
+        rules
+            .iter()
+            .any(|r| r.active && !r.dismissed && r.to.trim().eq_ignore_ascii_case(word.trim()))
+    };
+    let (keep, drop): (Vec<String>, Vec<String>) = std::mem::take(&mut store.words)
+        .into_iter()
+        .partition(|w| in_use(w));
+    store.words = keep;
+    if !drop.is_empty() {
+        out.changed = true;
+    }
+    out.drop = drop;
+    out
+}
+
+/// Before learning recorded its words: a dictionary word that some learned
+/// correction writes, and that isn't one of Moqi's starting words, was put
+/// there by learning (the user's own words were rarely also a correction).
+fn infer_learned_words(vocab: &[String], rules: &[Rule]) -> Vec<String> {
+    vocab
+        .iter()
+        .filter(|w| {
+            !config::DEFAULT_VOCAB
+                .iter()
+                .any(|d| d.eq_ignore_ascii_case(w.trim()))
+                && rules
+                    .iter()
+                    .any(|r| r.to.trim().eq_ignore_ascii_case(w.trim()))
+        })
+        .cloned()
+        .collect()
 }
 
 /// A misheard word rather than a reworded one (see the module docs). A fix
@@ -1064,6 +1202,15 @@ pub fn set_rule(app: &AppHandle, from: &str, to: &str, active: bool) {
         ((), changed)
     });
     super::sync::changed();
+    // Turned back on: its word returns to the dictionary; turned off: it
+    // leaves, unless another correction still writes it.
+    if active {
+        add_to_dictionary(
+            app,
+            &dictionary_words(&[(from.to_string(), to.to_string())]),
+        );
+    }
+    tidy_dictionary(app);
 }
 
 /// Every rule, removed ones included (sync needs them so a removal spreads).
@@ -1077,6 +1224,7 @@ pub fn replace_rules(app: &AppHandle, rules: Vec<Rule>) {
         s.rules = rules;
         ((), true)
     });
+    tidy_dictionary(app);
 }
 
 #[cfg(test)]
@@ -1286,6 +1434,7 @@ mod tests {
         let mut store = Store {
             rules: vec![rule("付費", "grok"), rule("過客", "grok"), rule("S", "x")],
             criteria: 0,
+            words: Vec::new(),
         };
         assert_eq!(recheck(&mut store, 5.0), 2);
         let active: Vec<&str> = store
@@ -1305,8 +1454,101 @@ mod tests {
                 ..rule("付費", "grok")
             }],
             criteria: 0,
+            words: Vec::new(),
         };
         assert_eq!(recheck(&mut twice, 5.0), 0);
+    }
+
+    fn active(from: &str, to: &str, on: bool) -> Rule {
+        Rule {
+            from: from.into(),
+            to: to.into(),
+            count: 1,
+            active: on,
+            dismissed: false,
+            last_seen: 1.0,
+            changed: 1.0,
+        }
+    }
+
+    fn words(list: &[&str]) -> Vec<String> {
+        list.iter().map(|w| w.to_string()).collect()
+    }
+
+    #[test]
+    fn words_learning_added_are_inferred_once() {
+        // The user's store on 2026-10-08: every learned word was a rule's target.
+        let rules = vec![
+            active("Make", "mac", true),
+            active("過客", "grok", true),
+            active("S", "x", false),
+            active("克勞德", "Claude", true),
+        ];
+        let vocab = words(&["Claude", "Supabase", "mac", "grok", "x", "默契"]);
+        // Claude is one of Moqi's starting words: the user's, not learning's.
+        assert_eq!(
+            infer_learned_words(&vocab, &rules),
+            words(&["mac", "grok", "x"])
+        );
+    }
+
+    #[test]
+    fn a_learned_word_leaves_when_no_correction_writes_it() {
+        let mut store = Store {
+            rules: vec![
+                active("S", "x", false),
+                active("Google Bard", "bot", false),
+                active("Sonnet", "sol", true),
+                active("So", "sol", false),
+            ],
+            criteria: CRITERIA,
+            words: words(&["x", "bot", "sol"]),
+        };
+        let vocab = words(&["Claude", "x", "bot", "sol", "my own word"]);
+        let done = tidy(&mut store, &vocab, 5.0);
+        // sol stays: Sonnet → sol is still in use.
+        assert_eq!(done.drop, words(&["x", "bot"]));
+        assert_eq!(store.words, words(&["sol"]));
+        assert_eq!(done.rules_off, 0);
+        // Nothing left to do the second time.
+        let vocab = words(&["Claude", "sol", "my own word"]);
+        assert!(!tidy(&mut store, &vocab, 6.0).changed);
+    }
+
+    #[test]
+    fn removing_a_learned_word_stops_the_corrections_that_write_it() {
+        let mut store = Store {
+            rules: vec![
+                active("Sonnet", "sol", true),
+                active("So", "sol", false),
+                active("過客", "grok", true),
+            ],
+            criteria: CRITERIA,
+            words: words(&["sol", "grok"]),
+        };
+        // The user took "sol" out of the dictionary.
+        let done = tidy(&mut store, &words(&["grok"]), 7.0);
+        assert_eq!(done.rules_off, 2);
+        assert!(done.drop.is_empty());
+        let sol: Vec<&Rule> = store.rules.iter().filter(|r| r.to == "sol").collect();
+        // Off for good: not learned again from one more sighting.
+        assert!(sol
+            .iter()
+            .all(|r| !r.active && r.dismissed && r.changed == 7.0));
+        assert!(store.rules.iter().any(|r| r.to == "grok" && r.active));
+        assert_eq!(store.words, words(&["grok"]));
+    }
+
+    #[test]
+    fn the_users_own_words_are_never_touched() {
+        let mut store = Store {
+            rules: vec![active("S", "x", false)],
+            criteria: CRITERIA,
+            words: Vec::new(),
+        };
+        // "x" here is the user's (not in `words`): it stays, rule or no rule.
+        let done = tidy(&mut store, &words(&["x"]), 5.0);
+        assert_eq!(done, Tidied::default());
     }
 
     #[test]

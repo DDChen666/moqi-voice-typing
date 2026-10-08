@@ -89,7 +89,7 @@ impl Default for YuyinConfig {
 
 /// A new install's dictionary: names Taiwanese speakers commonly mix into
 /// Chinese. The user edits it on the dictionary page.
-const DEFAULT_VOCAB: &[&str] = &[
+pub(crate) const DEFAULT_VOCAB: &[&str] = &[
     "Claude",
     "Claude Code",
     "ChatGPT",

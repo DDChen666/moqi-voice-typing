@@ -1085,6 +1085,9 @@ pub fn run(cli_args: CliArgs) {
             // Yuyin fork: write our defaults into the settings store on first
             // launch, before anything reads them.
             yuyin::defaults::apply(app.handle());
+            // Yuyin fork: bring learned corrections and the words they added
+            // to the dictionary up to date (yuyin/learn.rs `tidy`).
+            yuyin::learn::tidy_dictionary(app.handle());
             // Yuyin fork: a menu bar menu in the app's language.
             yuyin::app_menu::apply(app.handle());
             // Yuyin fork: any keychain prompt for the API key shows now, not

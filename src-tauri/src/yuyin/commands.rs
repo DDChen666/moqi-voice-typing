@@ -20,6 +20,8 @@ pub fn yuyin_get_config(app: AppHandle) -> YuyinConfig {
 pub fn yuyin_set_config(app: AppHandle, config: YuyinConfig) -> Result<(), String> {
     config::set(&app, config)?;
     super::sync::changed();
+    // A learned word the user removed stops the corrections that write it.
+    super::learn::tidy_dictionary(&app);
     Ok(())
 }
 

@@ -103,7 +103,14 @@ const SnippetsCard: React.FC<{
   );
 };
 
-const LearnedList: React.FC<{ enabled: boolean }> = ({ enabled }) => {
+// `refresh` changes when the dictionary did: removing a learned word stops
+// the corrections that write it. `onChange`: turning a correction off or on
+// takes its word out of the dictionary or puts it back (learn.rs `tidy`).
+const LearnedList: React.FC<{
+  enabled: boolean;
+  refresh: number;
+  onChange: () => void;
+}> = ({ enabled, refresh, onChange }) => {
   const { t } = useTranslation();
   const [rules, setRules] = useState<LearnedRule[] | null>(null);
 
@@ -117,11 +124,12 @@ const LearnedList: React.FC<{ enabled: boolean }> = ({ enabled }) => {
     load();
     window.addEventListener("focus", load);
     return () => window.removeEventListener("focus", load);
-  }, [load]);
+  }, [load, refresh]);
 
   const set = async (rule: LearnedRule, active: boolean) => {
     await yuyinApi.setLearned(rule.from, rule.to, active);
     load();
+    onChange();
   };
 
   return (
@@ -183,19 +191,23 @@ export const DictionaryPage: React.FC = () => {
   const { t } = useTranslation();
   const [config, setConfig] = useState<YuyinConfig | null>(null);
   const [draft, setDraft] = useState("");
+  const [refresh, setRefresh] = useState(0);
 
-  useEffect(() => {
+  const reload = useCallback(() => {
     yuyinApi
       .getConfig()
       .then(setConfig)
       .catch((e) => console.error("Failed to load dictionary:", e));
   }, []);
+  useEffect(reload, [reload]);
 
   // Starts from the saved list: learning may have added a word meanwhile.
   const change = async (edit: (vocab: string[]) => string[]) => {
     try {
       const latest = await yuyinApi.getConfig();
-      setConfig(await yuyinApi.updateConfig({ vocab: edit(latest.vocab) }));
+      await yuyinApi.updateConfig({ vocab: edit(latest.vocab) });
+      setConfig(await yuyinApi.getConfig());
+      setRefresh((n) => n + 1);
     } catch (e) {
       console.error("Failed to save dictionary:", e);
       toast.error(t("moqi.dictionary.saveFailed"));
@@ -285,7 +297,11 @@ export const DictionaryPage: React.FC = () => {
         }}
       />
 
-      <LearnedList enabled={config?.learn_from_edits === true} />
+      <LearnedList
+        enabled={config?.learn_from_edits === true}
+        refresh={refresh}
+        onChange={reload}
+      />
     </div>
   );
 };
