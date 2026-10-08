@@ -923,7 +923,8 @@ impl ShortcutAction for TranscribeAction {
                             }
 
                             if processed.final_text.is_empty() {
-                                utils::hide_recording_overlay(&ah);
+                                // Yuyin fork: say that nothing came out, not just vanish.
+                                crate::yuyin::output::show_failed(&ah);
                                 set_tray_state(&ah, TrayIconState::Idle);
                             } else {
                                 let ah_clone = ah.clone();
@@ -1018,7 +1019,9 @@ impl ShortcutAction for TranscribeAction {
                                     error!("Failed to save failed history entry: {}", save_err);
                                 }
                             }
-                            utils::hide_recording_overlay(&ah);
+                            // Yuyin fork: the main window's toast is usually hidden;
+                            // tell the user in the pill where the recording went.
+                            crate::yuyin::output::show_failed(&ah);
                             set_tray_state(&ah, TrayIconState::Idle);
                         }
                     }

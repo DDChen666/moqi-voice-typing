@@ -254,7 +254,8 @@
   animation: yy-fade 0.4s both;
 }
 .yy-cap.copied .yy-status,
-.yy-cap.fallback .yy-status {
+.yy-cap.fallback .yy-status,
+.yy-cap.failed .yy-status {
   color: #d1d1d6;
 }
 .yy-status svg {

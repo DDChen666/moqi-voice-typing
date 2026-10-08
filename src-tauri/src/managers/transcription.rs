@@ -256,6 +256,13 @@ pub struct TranscriptionManager {
     is_loading: Arc<Mutex<bool>>,
     loading_condvar: Arc<Condvar>,
     reload_model_on_next_use: Arc<AtomicBool>,
+    /// Yuyin fork: one batch transcription at a time. `transcribe` takes the
+    /// engine out of `engine` while it runs, so a second caller used to find
+    /// it missing and fail ("Model is not loaded"). The warm-up after a rest
+    /// (yuyin/warmup.rs) runs while the user speaks; when it was still going
+    /// at release, the dictation failed and nothing was pasted or copied.
+    /// Callers now wait their turn instead.
+    run_lock: Arc<Mutex<()>>,
     /// Routes real-time audio frames to the active streaming worker; see
     /// [`StreamRouter`]. Shared with the audio recorder so per-frame feeds skip
     /// Tauri state and the manager lock.
@@ -292,6 +299,7 @@ impl TranscriptionManager {
             is_loading: Arc::new(Mutex::new(false)),
             loading_condvar: Arc::new(Condvar::new()),
             reload_model_on_next_use: Arc::new(AtomicBool::new(false)),
+            run_lock: Arc::new(Mutex::new(())),
             router: Arc::new(StreamRouter::new()),
             stream_active: Arc::new(AtomicBool::new(false)),
             next_stream_worker_id: Arc::new(AtomicU64::new(1)),
@@ -1199,6 +1207,9 @@ impl TranscriptionManager {
             self.maybe_unload_immediately("empty audio");
             return Ok(String::new());
         }
+
+        // Yuyin fork: wait for a transcription already running (see `run_lock`).
+        let _run = self.run_lock.lock().unwrap_or_else(|e| e.into_inner());
 
         // Check if model is loaded, if not try to load it
         {

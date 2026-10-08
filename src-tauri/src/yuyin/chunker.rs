@@ -17,7 +17,7 @@
 //!   history and the WAV file. We only use it to find the tail.
 //! - Anything unexpected (a piece failed, the lengths disagree, a piece takes
 //!   too long) falls back to transcribing the whole recording in one go, as
-//!   before. Nothing is ever dropped.
+//!   before, and that gets a second try if it fails. Nothing is ever dropped.
 
 use std::sync::mpsc;
 use std::sync::{Arc, Condvar, Mutex, OnceLock};
@@ -247,7 +247,7 @@ pub fn transcribe(tm: &TranscriptionManager, samples: Vec<f32>) -> (Result<Strin
     let whole = |samples: Vec<f32>| {
         let tail_samples = samples.len();
         (
-            tm.transcribe(samples),
+            transcribe_retrying(tm, samples),
             Stats {
                 pieces: 0,
                 tail_samples,
@@ -311,6 +311,22 @@ pub fn transcribe(tm: &TranscriptionManager, samples: Vec<f32>) -> (Result<Strin
     let mut parts = texts;
     parts.push(tail_text);
     (Ok(join(&parts)), stats)
+}
+
+/// The whole recording, given a second try: one failed run must not lose
+/// the dictation. If the engine was dropped (it panicked), it is loaded
+/// again first; `transcribe` waits for the load.
+fn transcribe_retrying(tm: &TranscriptionManager, samples: Vec<f32>) -> Result<String> {
+    match tm.transcribe(samples.clone()) {
+        Ok(text) => Ok(text),
+        Err(e) => {
+            warn!("chunker: transcription failed ({e}); trying once more");
+            if !tm.is_model_loaded() {
+                tm.initiate_model_load();
+            }
+            tm.transcribe(samples)
+        }
+    }
 }
 
 /// Pieces cut so far in this recording (the replay check).

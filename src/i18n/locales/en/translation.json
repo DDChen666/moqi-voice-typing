@@ -748,6 +748,7 @@
     "yuyin": {
       "polishing": "Tidying",
       "fallback": "Clean-up didn't finish — pasted the raw text",
+      "failed": "Couldn't transcribe — the recording is in History",
       "handsFree": "Hands-free · press to finish",
       "sendsTo": "Text → {{to}}",
       "allLocal": "All local",

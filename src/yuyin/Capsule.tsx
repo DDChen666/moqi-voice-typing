@@ -12,7 +12,8 @@ export type CapsuleState =
   | "processing"
   | "done"
   | "fallback"
-  | "copied";
+  | "copied"
+  | "failed";
 
 type WritingContext = "chat" | "to_ai" | "notes" | "other";
 interface ContextEvent {
@@ -394,6 +395,12 @@ export const Capsule: React.FC<CapsuleProps> = ({
             <>
               <span className="yy-amber" />
               <span className="yy-status">{t("overlay.yuyin.fallback")}</span>
+            </>
+          )}
+          {state === "failed" && (
+            <>
+              <span className="yy-amber" />
+              <span className="yy-status">{t("overlay.yuyin.failed")}</span>
             </>
           )}
           {state === "copied" && (

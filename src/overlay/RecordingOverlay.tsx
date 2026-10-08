@@ -14,7 +14,7 @@ import { getLanguageDirection } from "@/lib/utils/rtl";
 // Yuyin fork: our capsule replaces the compact pill (see src/yuyin/Capsule.tsx).
 import { Capsule, type CapsuleState } from "@/yuyin/Capsule";
 
-// Yuyin fork: "done" / "fallback" / "copied" end a dictation in the capsule.
+// Yuyin fork: "done" / "fallback" / "copied" / "failed" end a dictation in the capsule.
 type OverlayState = "streaming" | CapsuleState;
 
 // Number of reactive bars in the waveform (the simple, smoothed style shared by

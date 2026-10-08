@@ -17,6 +17,8 @@ const DONE_DURATION: Duration = Duration::from_millis(650);
 /// needs time to be read.
 const LOCAL_DONE_DURATION: Duration = Duration::from_millis(1400);
 const FALLBACK_DURATION: Duration = Duration::from_millis(1600);
+/// A failure needs reading, and the user should notice it.
+const FAILED_DURATION: Duration = Duration::from_millis(2600);
 
 /// After a successful paste: a check mark, or a short notice that the raw
 /// transcript was pasted because the clean-up failed. Then the pill leaves.
@@ -28,6 +30,14 @@ pub fn show_result(app: &AppHandle, outcome: Option<PolishOutcome>) {
     };
     crate::overlay::show_result_overlay(app, state);
     hide_later(app, duration);
+}
+
+/// No text came out (recognition failed, or heard nothing): say so, and that
+/// the recording is in history, where it can be transcribed again. Before,
+/// the pill just vanished and the user thought the dictation was lost.
+pub fn show_failed(app: &AppHandle) {
+    crate::overlay::show_result_overlay(app, "failed");
+    hide_later(app, FAILED_DURATION);
 }
 
 fn hide_later(app: &AppHandle, after: Duration) {

@@ -617,6 +617,13 @@ fn run_headless_transcription(app: &AppHandle, args: &CliArgs) -> i32 {
                 return 1;
             }
         }
+        // Yuyin fork: `YUYIN_WARMUP_FIRST=1` starts the warm-up of a press after
+        // a rest just before, as when the user lets go while it still runs. That
+        // dictation used to fail (see `run_lock` in managers/transcription.rs).
+        if i == 0 && std::env::var_os("YUYIN_WARMUP_FIRST").is_some() {
+            crate::yuyin::warmup::rewarm_now(&tm);
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
         let t = Instant::now();
         match tm.transcribe(samples.clone()) {
             Ok(out) => text = out,
@@ -859,7 +866,10 @@ pub fn run(cli_args: CliArgs) {
             LogBuilder::new()
                 .level(log::LevelFilter::Trace) // Set to most verbose level globally
                 .max_file_size(500_000)
-                .rotation_strategy(RotationStrategy::KeepOne)
+                // Yuyin fork: keep the last few files. One 500 KB file is
+                // about two hours of dictation, so a failure from that morning
+                // had already been overwritten when the user reported it.
+                .rotation_strategy(RotationStrategy::KeepSome(5))
                 .clear_targets()
                 .targets([
                     // Console output respects RUST_LOG environment variable. In

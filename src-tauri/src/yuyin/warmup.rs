@@ -125,6 +125,12 @@ pub fn rewarm_if_idle(manager: &TranscriptionManager) {
     }
 }
 
+/// The rest's warm-up now, whatever the rest (`--transcribe-file` with
+/// `YUYIN_WARMUP_FIRST`, to check a dictation waits for it).
+pub fn rewarm_now(manager: &TranscriptionManager) {
+    run(manager, &CLIPS[..1]);
+}
+
 /// Run the warm-up in the background; returns at once.
 #[cfg(target_os = "windows")]
 pub fn start(manager: &TranscriptionManager) {
