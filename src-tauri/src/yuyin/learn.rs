@@ -84,7 +84,9 @@ pub struct Rule {
 /// rules learned under looser criteria are checked again (see [`recheck`]).
 /// 3 (2026-10-08): which dictionary words learning added is recorded; for
 /// the words from before, it is inferred (see [`infer_learned_words`]).
-const CRITERIA: u32 = 3;
+/// 4 (2026-10-09): punctuation at the ends of a change is not learned; rules
+/// learned with it are turned off (see [`punctuated_off`]).
+const CRITERIA: u32 = 4;
 
 #[derive(Default, Serialize, Deserialize)]
 struct Store {
@@ -123,6 +125,12 @@ fn with_store<T>(app: &AppHandle, f: impl FnOnce(&mut Store) -> (T, bool)) -> T 
     }
     if store.criteria < 3 {
         store.words = infer_learned_words(&config::get(app).vocab, &store.rules);
+    }
+    if store.criteria < 4 {
+        let off = punctuated_off(store, now_ms());
+        if off > 0 {
+            debug!("learn: {off} correction(s) learned with punctuation are off now");
+        }
     }
     store.criteria = CRITERIA;
     let (result, changed) = f(store);
@@ -508,6 +516,12 @@ fn diff(a: &[&str], b: &[&str]) -> Vec<Op> {
     ops
 }
 
+/// Punctuation that ends or splits a sentence, never part of a term (unlike
+/// the + of C++, the # of C# or the . of .NET).
+fn sentence_mark(c: char) -> bool {
+    "，。、！？：；…「」『』（）【】《》,;!?".contains(c)
+}
+
 /// Diffs bigger than this many token pairs are not worth comparing.
 const MAX_CELLS: usize = 4_000_000;
 /// Tokens on either side of one correction.
@@ -580,6 +594,25 @@ fn correction(
     if all_marks(a, dels) || all_marks(b, inss) {
         return None;
     }
+    // Sentence punctuation at either end belongs to the sentence, not the
+    // word: a user who retyped "時間。" as "實踐" fixed 時間, and "時間。 →
+    // 實踐" would eat the 。 wherever it applied. Past a trimmed mark, the
+    // unchanged token is no longer the word's neighbour, so it can't widen a
+    // lone character.
+    let edges = |text: &str, toks: &[Tok], idx: &[usize]| {
+        let mark = |i: &&usize| {
+            text[toks[**i].start..toks[**i].end]
+                .chars()
+                .all(sentence_mark)
+        };
+        let lead = idx.iter().take_while(mark).count();
+        (lead, idx.len() - idx.iter().rev().take_while(mark).count())
+    };
+    let (dels_from, dels_to) = edges(pasted, a, dels);
+    let (inss_from, inss_to) = edges(edited, b, inss);
+    let before = before.filter(|_| dels_from == 0 && inss_from == 0);
+    let after = after.filter(|_| dels_to == dels.len() && inss_to == inss.len());
+    let (dels, inss) = (&dels[dels_from..dels_to], &inss[inss_from..inss_to]);
     let (mut from_start, mut from_end) = (a[dels[0]].start, a[*dels.last()?].end);
     let (mut to_start, mut to_end) = (b[inss[0]].start, b[*inss.last()?].end);
     // One changed Chinese character is too small to apply on its own
@@ -899,6 +932,26 @@ fn recheck(store: &mut Store, now: f64) -> usize {
     let mut off = 0;
     for rule in store.rules.iter_mut().filter(|r| r.active && !r.dismissed) {
         if rule.count < times_needed(&rule.from, &rule.to) {
+            rule.active = false;
+            rule.changed = now;
+            off += 1;
+        }
+    }
+    off
+}
+
+/// Stop applying the rules learned with punctuation at an end ("時間。 →
+/// 實踐", "Grokbot， → grokbot"): they ate the mark wherever they applied.
+/// Off, not removed, like [`recheck`]'s. Returns how many were turned off.
+fn punctuated_off(store: &mut Store, now: f64) -> usize {
+    let at_an_end = |s: &str| {
+        let s = s.trim();
+        s.chars().next().is_some_and(sentence_mark)
+            || s.chars().next_back().is_some_and(sentence_mark)
+    };
+    let mut off = 0;
+    for rule in store.rules.iter_mut().filter(|r| r.active && !r.dismissed) {
+        if at_an_end(&rule.from) || at_an_end(&rule.to) {
             rule.active = false;
             rule.changed = now;
             off += 1;
@@ -1274,6 +1327,60 @@ mod tests {
         );
         // At the very start there is only the character after it.
         assert_eq!(pairs("周末見", "週末見"), vec![pair("周末", "週末")]);
+    }
+
+    #[test]
+    fn sentence_punctuation_at_the_ends_is_not_learned() {
+        // The user's two, on Windows: they retyped the punctuation too.
+        assert_eq!(
+            pairs("我們缺少的是時間。", "我們缺少的是實踐"),
+            vec![pair("時間", "實踐")]
+        );
+        assert_eq!(
+            pairs("問 Grokbot，它會說", "問 grokbot 它會說"),
+            vec![pair("Grokbot", "grokbot")]
+        );
+        // A lone character still takes its neighbour, on the untouched side.
+        assert_eq!(pairs("時辰。很趕", "時程很趕"), vec![pair("時辰", "時程")]);
+        // Marks that are part of a term stay.
+        assert_eq!(
+            pairs("我在學西加加", "我在學 C++"),
+            vec![pair("西加加", "C++")]
+        );
+    }
+
+    #[test]
+    fn rules_learned_with_punctuation_are_turned_off_once() {
+        let rule = |from: &str, to: &str| Rule {
+            from: from.into(),
+            to: to.into(),
+            count: 1,
+            active: true,
+            dismissed: false,
+            last_seen: 1.0,
+            changed: 1.0,
+        };
+        let mut store = Store {
+            rules: vec![
+                rule("時間。", "實踐"),
+                rule("Grokbot，", "grokbot"),
+                rule("make", "MAC"),
+                rule("西加加", "C++"),
+            ],
+            criteria: 3,
+            words: Vec::new(),
+        };
+        assert_eq!(punctuated_off(&mut store, 5.0), 2);
+        let active: Vec<&str> = store
+            .rules
+            .iter()
+            .filter(|r| r.active)
+            .map(|r| r.from.as_str())
+            .collect();
+        assert_eq!(active, vec!["make", "西加加"]);
+        // Off, not removed, like the recheck's.
+        assert!(store.rules.iter().all(|r| !r.dismissed));
+        assert_eq!(store.rules[0].changed, 5.0);
     }
 
     #[test]
