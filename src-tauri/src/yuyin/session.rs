@@ -472,11 +472,17 @@ pub fn finish(app: &AppHandle) -> Option<PolishOutcome> {
         sent_to: s.sent_to,
         file_name: s.file_name,
     };
+    append_record(app, &record);
+    Some(outcome)
+}
+
+/// One line of `yuyin_timings.jsonl`.
+fn append_record(app: &AppHandle, record: &impl Serialize) {
     let Some(path) = timings_path(app) else {
-        return Some(outcome);
+        return;
     };
-    let Ok(line) = serde_json::to_string(&record) else {
-        return Some(outcome);
+    let Ok(line) = serde_json::to_string(record) else {
+        return;
     };
     let _guard = TIMINGS_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let result = std::fs::OpenOptions::new()
@@ -487,7 +493,45 @@ pub fn finish(app: &AppHandle) -> Option<PolishOutcome> {
     if let Err(e) = result {
         warn!("Failed to write yuyin timing record: {e}");
     }
-    Some(outcome)
+}
+
+/// What a recording transcribed again from history (重新辨識) sent to the
+/// clean-up service, kept under its entry like a dictation's record, so the
+/// history says what left the computer. `retry` keeps it out of the
+/// statistics: it is not another dictation.
+#[derive(Serialize)]
+struct RetryRecord<'a> {
+    at: u128,
+    retry: bool,
+    context: Context,
+    polish: &'static str,
+    chars_in: usize,
+    chars_out: usize,
+    app: &'static str,
+    sent_chars: usize,
+    sent_to: &'a str,
+    file_name: &'a str,
+}
+
+pub fn note_retry_sent(app: &AppHandle, file_name: &str, chars: usize, host: &str) {
+    append_record(
+        app,
+        &RetryRecord {
+            at: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_millis())
+                .unwrap_or(0),
+            retry: true,
+            context: Context::Other,
+            polish: "retry",
+            chars_in: chars,
+            chars_out: 0,
+            app: "",
+            sent_chars: chars,
+            sent_to: host,
+            file_name,
+        },
+    );
 }
 
 #[cfg(target_os = "macos")]

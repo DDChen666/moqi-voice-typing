@@ -170,8 +170,14 @@ pub async fn polish(app: &AppHandle, transcript: &str) -> String {
 /// Chinese and the recognizer's spacing make the 原話; then a voice snippet,
 /// or the learned corrections and the clean-up at the user's level. Which app
 /// it was said in is not kept, so the clean-up uses the general context.
-/// Returns the 原話 and, when it differs, the text after the clean-up.
-pub async fn retried(app: &AppHandle, transcription: &str) -> (String, Option<String>) {
+/// Returns the 原話 and, when it differs, the text after the clean-up. What
+/// the clean-up sent is noted under `file_name`, the entry's recording, so
+/// the history shows it (`session::note_retry_sent`).
+pub async fn retried(
+    app: &AppHandle,
+    transcription: &str,
+    file_name: &str,
+) -> (String, Option<String>) {
     let converted = crate::actions::process_transcription_output(app, transcription, false).await;
     let heard = super::spacing::tidy(&converted.final_text);
     let cfg = config::get(app);
@@ -179,6 +185,17 @@ pub async fn retried(app: &AppHandle, transcription: &str) -> (String, Option<St
         Some(snippet) => snippet.to_string(),
         None => {
             let corrected = super::learn::apply(app, &heard);
+            // `run` notes what it sends on the dictation in progress, which a
+            // retry is not: note it on this entry instead. Counted whenever a
+            // request goes out, so the history never under-reports.
+            let to = host(&cfg.base_url);
+            let sends = cfg.level != Level::Raw
+                && !corrected.trim().is_empty()
+                && !is_loopback(&to)
+                && usable_key(&cfg).is_some();
+            if sends {
+                session::note_retry_sent(app, file_name, corrected.chars().count(), &to);
+            }
             let extras = session::Extras::default();
             let polished = match run(&cfg, Context::Other, &extras, &corrected).await {
                 Ok(Some(text)) => taiwan_weeks(app, &extras, text),

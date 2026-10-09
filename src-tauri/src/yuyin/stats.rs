@@ -34,6 +34,10 @@ struct Record {
     sent_chars: Option<u64>,
     sent_to: Option<String>,
     file_name: Option<String>,
+    /// What a recording transcribed again from history sent
+    /// (`session::note_retry_sent`): counts as sent, not as a dictation.
+    #[serde(default)]
+    retry: bool,
 }
 
 impl Record {
@@ -169,7 +173,13 @@ pub fn stats(app: &AppHandle) -> Stats {
 }
 
 pub fn history_meta(app: &AppHandle) -> HashMap<String, EntryMeta> {
-    read_records(app)
+    meta_by_file(read_records(app))
+}
+
+fn meta_by_file(records: Vec<Record>) -> HashMap<String, EntryMeta> {
+    let (retries, dictations): (Vec<Record>, Vec<Record>) =
+        records.into_iter().partition(|r| r.retry);
+    let mut meta: HashMap<String, EntryMeta> = dictations
         .into_iter()
         .filter_map(|r| {
             let file_name = r.file_name.clone()?;
@@ -188,7 +198,33 @@ pub fn history_meta(app: &AppHandle) -> HashMap<String, EntryMeta> {
                 },
             ))
         })
-        .collect()
+        .collect();
+    // A recording transcribed again sent its text once more: add it to the
+    // entry, which has no record of its own when the dictation had failed.
+    for r in retries {
+        let Some(file_name) = r.file_name.clone() else {
+            continue;
+        };
+        let (chars, to) = r.sent();
+        meta.entry(file_name)
+            .and_modify(|m| {
+                m.sent_chars += chars;
+                if m.sent_to.is_none() {
+                    m.sent_to = to.clone();
+                }
+            })
+            .or_insert(EntryMeta {
+                app: String::new(),
+                context: r.context,
+                level: r.level,
+                polish: r.polish,
+                sent_chars: chars,
+                sent_to: to,
+                spoke_ms: None,
+                output_ms: None,
+            });
+    }
+    meta
 }
 
 fn compute(
@@ -196,6 +232,11 @@ fn compute(
     today: NaiveDate,
     date_of: impl Fn(i64) -> Option<NaiveDate>,
 ) -> Stats {
+    // Everything that was sent counts toward privacy; only dictations count
+    // as dictations.
+    let sent: Vec<(u64, Option<String>)> = records.iter().map(Record::sent).collect();
+    let dictations: Vec<&Record> = records.iter().filter(|r| !r.retry).collect();
+    let records = dictations.as_slice();
     let chars: u64 = records.iter().map(|r| r.chars_out).sum();
     // Speech, not key-down time: a recording left running (a stuck key, a
     // hands-free session nobody ended) would otherwise drag the speed down.
@@ -252,7 +293,6 @@ fn compute(
         })
         .collect();
 
-    let sent: Vec<(u64, Option<String>)> = records.iter().map(Record::sent).collect();
     let mut sent_to: Vec<String> = sent.iter().filter_map(|(_, to)| to.clone()).collect();
     sent_to.sort();
     sent_to.dedup();
@@ -302,6 +342,45 @@ mod tests {
 
     fn date_of_utc(at: i64) -> Option<NaiveDate> {
         chrono::DateTime::from_timestamp_millis(at).map(|t| t.date_naive())
+    }
+
+    fn retry(file: &str, sent: u64) -> Record {
+        Record {
+            retry: true,
+            context: "other".into(),
+            polish: "retry".into(),
+            file_name: Some(file.into()),
+            ..rec("2026-09-28", 0, 0, sent)
+        }
+    }
+
+    #[test]
+    fn a_retry_counts_as_sent_not_as_a_dictation() {
+        let records = vec![rec("2026-09-28", 100, 30_000, 100), retry("a.wav", 40)];
+        let s = compute(&records, day("2026-09-28"), date_of_utc);
+        assert_eq!(s.dictations, 1);
+        assert_eq!(s.chars, 100);
+        assert_eq!(s.privacy.text_sent_chars, 140);
+    }
+
+    #[test]
+    fn a_retry_shows_under_its_entry() {
+        let dictated = Record {
+            file_name: Some("ok.wav".into()),
+            app: "Code".into(),
+            ..rec("2026-09-28", 20, 3_000, 20)
+        };
+        let meta = meta_by_file(vec![dictated, retry("ok.wav", 20), retry("failed.wav", 35)]);
+        // Retried after a dictation: both sends, the dictation's details.
+        assert_eq!(meta["ok.wav"].sent_chars, 40);
+        assert_eq!(meta["ok.wav"].app, "Code");
+        // A failed dictation has no record of its own: the retry is it.
+        assert_eq!(meta["failed.wav"].sent_chars, 35);
+        assert_eq!(
+            meta["failed.wav"].sent_to.as_deref(),
+            Some("api.deepseek.com")
+        );
+        assert_eq!(meta["failed.wav"].context, "other");
     }
 
     #[test]

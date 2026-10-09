@@ -108,7 +108,8 @@ pub async fn retry_history_entry_transcription(
     // clean-up, and Handy's post-processing, which it meant upstream, is not
     // offered in Moqi: run here, it found no provider and dropped the
     // Traditional Chinese text, so a retried entry came out in Simplified.
-    let (heard, cleaned) = crate::yuyin::polish::retried(&app, &transcription).await;
+    let (heard, cleaned) =
+        crate::yuyin::polish::retried(&app, &transcription, &entry.file_name).await;
     history_manager
         .update_transcription(id, heard, cleaned, None)
         .map(|_| ())
