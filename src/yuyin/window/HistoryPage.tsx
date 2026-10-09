@@ -276,11 +276,13 @@ const EntryRow: React.FC<{
             <div className="text-[11px] font-semibold text-muted">
               {t("moqi.history.whatWasSent")}
             </div>
-            {!meta ? (
+            {/* A failed dictation keeps no record and sent nothing; only
+                entries from before records were kept have none to show. */}
+            {!meta && !failed ? (
               <div className="text-[12.5px] text-muted">
                 {t("moqi.history.noRecord")}
               </div>
-            ) : local ? (
+            ) : !meta || local ? (
               <div className="text-[12.5px] text-positive">
                 {t("moqi.history.nothingSent")}
               </div>
