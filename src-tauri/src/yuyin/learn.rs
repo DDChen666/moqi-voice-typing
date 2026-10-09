@@ -86,7 +86,9 @@ pub struct Rule {
 /// the words from before, it is inferred (see [`infer_learned_words`]).
 /// 4 (2026-10-09): punctuation at the ends of a change is not learned; rules
 /// learned with it are turned off (see [`punctuated_off`]).
-const CRITERIA: u32 = 4;
+/// 5 (2026-10-09): a common word needs correcting twice (see
+/// [`common_word`]); rules learned from one are checked again.
+const CRITERIA: u32 = 5;
 
 #[derive(Default, Serialize, Deserialize)]
 struct Store {
@@ -130,6 +132,12 @@ fn with_store<T>(app: &AppHandle, f: impl FnOnce(&mut Store) -> (T, bool)) -> T 
         let off = punctuated_off(store, now_ms());
         if off > 0 {
             debug!("learn: {off} correction(s) learned with punctuation are off now");
+        }
+    }
+    if store.criteria < 5 {
+        let off = common_off(store, now_ms());
+        if off > 0 {
+            debug!("learn: {off} correction(s) of common words are off now");
         }
     }
     store.criteria = CRITERIA;
@@ -917,12 +925,50 @@ fn infer_learned_words(vocab: &[String], rules: &[Rule]) -> Vec<String> {
 /// typed must be long enough to replace everywhere: learned at once, 付費 →
 /// grok (the user rewrote that part) turned every later 付費 into grok, and
 /// S → x every S. Those now need making twice, like any rewording.
+///
+/// A common word (時間, 感到) is what the recognizer heard more often than
+/// not: one same-sound fix of it is likely the user changing their mind
+/// (時間 → 實踐 replaced every later 時間, seen on Windows 2026-10-09).
 fn misheard(from: &str, to: &str) -> bool {
+    if common_word(from) {
+        return false;
+    }
     if is_english(to) {
         same_letters(from, to) || (long_enough(from) && sounds_like_spelling(from, to))
     } else {
         sounds_alike(from, to)
     }
+}
+
+/// The common words (data/common_words.txt): about 2,700 everyday words of
+/// two or more characters from jieba's word frequencies, in Simplified,
+/// Traditional and Taiwan forms. 時間 is one; 時辰, 定位 and 代辦, which the
+/// recognizer does write for 時程, 訂位 and 待辦, are not.
+static COMMON_WORDS: Lazy<std::collections::HashSet<&'static str>> = Lazy::new(|| {
+    include_str!("data/common_words.txt")
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        .collect()
+});
+
+fn common_word(word: &str) -> bool {
+    COMMON_WORDS.contains(word.trim())
+}
+
+/// Turn off the corrections of a common word made only once (CRITERIA 5).
+/// Only these: a rule the user turned back on after an earlier recheck stays.
+fn common_off(store: &mut Store, now: f64) -> usize {
+    let mut off = 0;
+    for rule in store.rules.iter_mut() {
+        if rule.active && !rule.dismissed && rule.count < TIMES_TO_LEARN && common_word(&rule.from)
+        {
+            rule.active = false;
+            rule.changed = now;
+            off += 1;
+        }
+    }
+    off
 }
 
 /// Stop applying the rules that were learned at once but would now need
@@ -1035,6 +1081,8 @@ fn english_consonants(word: &str) -> Vec<char> {
             // The g of -ng (timing) is part of the n.
             'g' if i > 0 && letters[i - 1] == 'n' && !vowel(next) => "",
             'c' | 'g' if soft => "S",
+            // ch is k before r or l (Chrome, Christmas, chlorine).
+            'c' if next == Some(&'h') && matches!(letters.get(i + 2), Some('r' | 'l')) => "K",
             'c' if next == Some(&'h') => "S",
             'c' | 'g' => "K",
             'x' => "KS",
@@ -1665,10 +1713,61 @@ mod tests {
     }
 
     #[test]
+    fn a_common_word_needs_correcting_twice_even_when_it_sounds_alike() {
+        // Same sound, but 時間 is what people say: seen once, it is more likely
+        // the user changing their mind than the recognizer mishearing.
+        for (from, to) in [
+            ("時間", "實踐"),
+            ("連接", "連結"),
+            ("感到", "趕到"),
+            ("时间", "实践"),
+        ] {
+            assert!(sounds_alike(from, to), "{from} -> {to}");
+            assert!(!misheard(from, to), "{from} -> {to}");
+            assert_eq!(times_needed(from, to), TIMES_TO_LEARN, "{from} -> {to}");
+        }
+        // Rare words the recognizer writes for what was said stay at once.
+        for (from, to) in [("時辰", "時程"), ("定位", "訂位"), ("代辦", "待辦")] {
+            assert!(misheard(from, to), "{from} -> {to}");
+        }
+    }
+
+    #[test]
+    fn common_word_rules_made_once_are_turned_off_once() {
+        let mut store = Store {
+            rules: vec![
+                active("時間", "實踐", true),
+                active("過客", "grok", true),
+                Rule {
+                    count: 2,
+                    ..active("連接", "連結", true)
+                },
+            ],
+            criteria: 4,
+            words: Vec::new(),
+        };
+        assert_eq!(common_off(&mut store, 9.0), 1);
+        let on: Vec<&str> = store
+            .rules
+            .iter()
+            .filter(|r| r.active)
+            .map(|r| r.from.as_str())
+            .collect();
+        // Made twice, so the user meant it.
+        assert_eq!(on, vec!["過客", "連接"]);
+        assert!(!store.rules[0].dismissed);
+    }
+
+    #[test]
+    fn ch_before_r_is_a_k() {
+        assert!(sounds_like_spelling("cron", "CHROME"));
+        assert!(misheard("cron", "Chrome"));
+    }
+
+    #[test]
     fn misheard_words_sound_alike_rewordings_do_not() {
         for (a, b) in [
             ("實做", "實作"),
-            ("連接", "連結"),
             ("先定", "先訂"),
             ("太滑", "太花"),
             ("這周", "這週"),
