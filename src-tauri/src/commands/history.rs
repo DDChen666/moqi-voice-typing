@@ -1,4 +1,3 @@
-use crate::actions::process_transcription_output;
 use crate::managers::{
     history::{HistoryManager, PaginatedHistory},
     transcription::TranscriptionManager,
@@ -104,15 +103,14 @@ pub async fn retry_history_entry_transcription(
         return Err("Recording contains no speech".to_string());
     }
 
-    let processed =
-        process_transcription_output(&app, &transcription, entry.post_process_requested).await;
+    // Yuyin fork: Moqi's steps after recognition, as for a dictation
+    // (yuyin/polish.rs `retried`). `post_process_requested` is set by Moqi's
+    // clean-up, and Handy's post-processing, which it meant upstream, is not
+    // offered in Moqi: run here, it found no provider and dropped the
+    // Traditional Chinese text, so a retried entry came out in Simplified.
+    let (heard, cleaned) = crate::yuyin::polish::retried(&app, &transcription).await;
     history_manager
-        .update_transcription(
-            id,
-            transcription,
-            processed.post_processed_text,
-            processed.post_process_prompt,
-        )
+        .update_transcription(id, heard, cleaned, None)
         .map(|_| ())
         .map_err(|e| e.to_string())
 }

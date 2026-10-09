@@ -165,6 +165,36 @@ pub async fn polish(app: &AppHandle, transcript: &str) -> String {
     text
 }
 
+/// A recording transcribed again from history (重新辨識): what a dictation
+/// does after recognition, so the entry reads like the others. Traditional
+/// Chinese and the recognizer's spacing make the 原話; then a voice snippet,
+/// or the learned corrections and the clean-up at the user's level. Which app
+/// it was said in is not kept, so the clean-up uses the general context.
+/// Returns the 原話 and, when it differs, the text after the clean-up.
+pub async fn retried(app: &AppHandle, transcription: &str) -> (String, Option<String>) {
+    let converted = crate::actions::process_transcription_output(app, transcription, false).await;
+    let heard = super::spacing::tidy(&converted.final_text);
+    let cfg = config::get(app);
+    let text = match super::snippets::expand(&cfg.snippets, &heard) {
+        Some(snippet) => snippet.to_string(),
+        None => {
+            let corrected = super::learn::apply(app, &heard);
+            let extras = session::Extras::default();
+            let polished = match run(&cfg, Context::Other, &extras, &corrected).await {
+                Ok(Some(text)) => taiwan_weeks(app, &extras, text),
+                Ok(None) => corrected,
+                Err(e) => {
+                    warn!("Polish of a retried recording failed, keeping the transcript: {e}");
+                    corrected
+                }
+            };
+            super::spacing::tidy(&super::learn::apply(app, &polished))
+        }
+    };
+    let cleaned = (text != heard).then_some(text);
+    (heard, cleaned)
+}
+
 /// The model writes 這周 where Taiwan writes 這週 (wording.rs). Only for
 /// Traditional Chinese output that isn't being translated: 周 is correct in
 /// Simplified Chinese and in Japanese.
