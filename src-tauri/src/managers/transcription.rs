@@ -244,6 +244,16 @@ impl Drop for StreamWorkerGuard {
     }
 }
 
+/// Yuyin fork: clears `TranscriptionManager::batch_engine_out` however a batch
+/// transcription ends.
+struct EngineOut<'a>(&'a AtomicBool);
+
+impl Drop for EngineOut<'_> {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::Release);
+    }
+}
+
 #[derive(Clone)]
 pub struct TranscriptionManager {
     engine: Arc<Mutex<Option<LoadedEngine>>>,
@@ -263,6 +273,12 @@ pub struct TranscriptionManager {
     /// at release, the dictation failed and nothing was pasted or copied.
     /// Callers now wait their turn instead.
     run_lock: Arc<Mutex<()>>,
+    /// Yuyin fork: true while `transcribe` has the engine out of `engine`. The
+    /// model is still loaded, only busy, and `is_model_loaded()` says so. Without
+    /// it a key press during the warm-up (or while a dictation was still being
+    /// transcribed) found no engine and loaded a second copy of the model, which
+    /// on Windows also queued a second warm-up ahead of the dictation.
+    batch_engine_out: Arc<AtomicBool>,
     /// Routes real-time audio frames to the active streaming worker; see
     /// [`StreamRouter`]. Shared with the audio recorder so per-frame feeds skip
     /// Tauri state and the manager lock.
@@ -300,6 +316,7 @@ impl TranscriptionManager {
             loading_condvar: Arc::new(Condvar::new()),
             reload_model_on_next_use: Arc::new(AtomicBool::new(false)),
             run_lock: Arc::new(Mutex::new(())),
+            batch_engine_out: Arc::new(AtomicBool::new(false)),
             router: Arc::new(StreamRouter::new()),
             stream_active: Arc::new(AtomicBool::new(false)),
             next_stream_worker_id: Arc::new(AtomicU64::new(1)),
@@ -392,7 +409,10 @@ impl TranscriptionManager {
     pub fn is_model_loaded(&self) -> bool {
         // The engine may be leased out to the streaming worker (taken out of
         // the mutex). It's still loaded, just in use, so report true.
-        self.lock_engine().is_some() || self.active_engine_lease.load(Ordering::Acquire) != 0
+        // Yuyin fork: likewise while a batch transcription holds it.
+        self.lock_engine().is_some()
+            || self.active_engine_lease.load(Ordering::Acquire) != 0
+            || self.batch_engine_out.load(Ordering::Acquire)
     }
 
     /// Accelerator changes should not disturb the current transcription. Mark
@@ -1282,6 +1302,11 @@ impl TranscriptionManager {
                     ));
                 }
             };
+            // Yuyin fork: still loaded while we hold it (see `batch_engine_out`).
+            // Set under the engine lock, cleared when this block ends: after the
+            // engine went back, or was dropped by a panic (then it is unloaded).
+            self.batch_engine_out.store(true, Ordering::Release);
+            let _engine_out = EngineOut(&self.batch_engine_out);
 
             // Release the lock before transcribing — no mutex held during the engine call
             drop(engine_guard);
