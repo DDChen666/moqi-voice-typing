@@ -392,6 +392,8 @@ export const HistoryPage: React.FC<{
         setEntries((prev) =>
           prev.map((e) => (e.id === p.entry.id ? p.entry : e)),
         );
+        // 重新辨識 may have sent the text again: show it under the entry.
+        loadMeta();
       }
     });
     return () => {
