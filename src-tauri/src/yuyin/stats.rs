@@ -384,6 +384,17 @@ mod tests {
     }
 
     #[test]
+    fn a_retry_that_sent_nothing_says_so() {
+        // A failed dictation retried at 原話 (or without a key): it has text
+        // now, and its record says nothing left, not "an old version's entry".
+        let meta = meta_by_file(vec![retry("raw.wav", 0)]);
+        assert_eq!(meta["raw.wav"].sent_chars, 0);
+        assert_eq!(meta["raw.wav"].sent_to, None);
+        let s = compute(&[retry("raw.wav", 0)], day("2026-09-28"), date_of_utc);
+        assert_eq!((s.dictations, s.privacy.text_sent_chars), (0, 0));
+    }
+
+    #[test]
     fn totals_speed_and_saved_time() {
         let records = vec![
             rec("2026-09-27", 120, 40_000, 120),

@@ -497,8 +497,10 @@ fn append_record(app: &AppHandle, record: &impl Serialize) {
 
 /// What a recording transcribed again from history (重新辨識) sent to the
 /// clean-up service, kept under its entry like a dictation's record, so the
-/// history says what left the computer. `retry` keeps it out of the
-/// statistics: it is not another dictation.
+/// history says what left the computer. Written when nothing was sent too
+/// (原話, no key): a failed dictation has no record of its own, and without
+/// this one, once it has text it would read as an entry from an old version.
+/// `retry` keeps it out of the statistics: it is not another dictation.
 #[derive(Serialize)]
 struct RetryRecord<'a> {
     at: u128,
@@ -509,11 +511,13 @@ struct RetryRecord<'a> {
     chars_out: usize,
     app: &'static str,
     sent_chars: usize,
-    sent_to: &'a str,
+    sent_to: Option<&'a str>,
     file_name: &'a str,
 }
 
-pub fn note_retry_sent(app: &AppHandle, file_name: &str, chars: usize, host: &str) {
+/// `sent`: the characters sent and where, or `None` when nothing left.
+pub fn note_retry(app: &AppHandle, file_name: &str, sent: Option<(usize, &str)>) {
+    let chars = sent.map_or(0, |(chars, _)| chars);
     append_record(
         app,
         &RetryRecord {
@@ -528,7 +532,7 @@ pub fn note_retry_sent(app: &AppHandle, file_name: &str, chars: usize, host: &st
             chars_out: 0,
             app: "",
             sent_chars: chars,
-            sent_to: host,
+            sent_to: sent.map(|(_, host)| host),
             file_name,
         },
     );
