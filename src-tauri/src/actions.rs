@@ -853,6 +853,13 @@ impl ShortcutAction for TranscribeAction {
                                     // and 嗎。 → 嗎？, before history and the clean-up.
                                     processed.final_text =
                                         crate::yuyin::spacing::tidy(&processed.final_text);
+                                    // The same text kept above as the post-processed one
+                                    // too: history shows it when the clean-up changes
+                                    // nothing, and it must be what was pasted (history
+                                    // said "V S Code" where "VS Code" was pasted).
+                                    if let Some(text) = processed.post_processed_text.as_mut() {
+                                        *text = crate::yuyin::spacing::tidy(text);
+                                    }
                                     // Yuyin fork: history's 原話 is the Traditional
                                     // Chinese text before clean-up, not the engine's
                                     // Simplified output.
