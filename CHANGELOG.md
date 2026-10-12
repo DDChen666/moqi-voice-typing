@@ -2,6 +2,20 @@
 
 格式參考 [Keep a Changelog](https://keepachangelog.com/zh-TW/1.1.0/)，版本號遵循 [語意化版本](https://semver.org/lang/zh-TW/)。
 
+## [1.3.0] — 2026-10-12
+
+任何 Windows 電腦都能用：沒有獨立顯示卡的電腦，默契會自動改用在 CPU 上也很快的辨識模型。這一版只發布 Windows；Mac 版之後跟上。
+
+### 新功能
+
+- **沒有獨立顯示卡也能用**：默契會看你的電腦自動選辨識模型。有 4 GB 以上的獨立顯示卡，照舊用最準的 Qwen3-ASR（約 1.5 GB）；沒有的話（只有內建顯示晶片，或只有 CPU），改用 SenseVoice（約 150 MB），在 CPU 上放開按鍵後約 0.1–0.4 秒出字（Intel i5-12400 實測）。錯字比較多，英文詞尤其明顯；之前在這種電腦上，一句話要等 6 秒以上。
+- 已經裝了舊版、但電腦沒有獨立顯示卡的人：更新後，默契會在背景下載新模型，下載好就自動換過去。
+- 第一次開啟時，辨識模型那一行會顯示實際要下載的大小。
+
+### 修正
+
+- 中文和英文詞之間自動加空格（「會post」→「會 post」）。
+
 ## [1.2.0] — 2026-10-12
 
 錯一次、第二次就對：默契會從你改過的字學習，而且學得更快、更準。這一版先發布 Windows；Mac 版之後跟上，同時補上 1.1.0 的所有新功能。
@@ -115,6 +129,7 @@
 - 讀取輔助使用屬性時，屬性不存在會讓 App 當掉。
 - 鑰匙圈的密碼視窗在說話途中跳出，導致錄音停不下來；改成打開 App 時就先讀取。
 
+[1.3.0]: https://github.com/DDChen666/moqi-voice-typing/releases/tag/v1.3.0
 [1.2.0]: https://github.com/DDChen666/moqi-voice-typing/releases/tag/v1.2.0
 [1.1.0]: https://github.com/DDChen666/moqi-voice-typing/releases/tag/v1.1.0
 [1.0.0]: https://github.com/DDChen666/moqi-voice-typing/releases/tag/v1.0.0
