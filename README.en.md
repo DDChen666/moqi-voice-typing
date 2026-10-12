@@ -21,7 +21,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version: Windows 1.1.0, Mac 1.0.0" src="https://img.shields.io/badge/version-Windows%201.1.0%20%C2%B7%20Mac%201.0.0-0a84ff?style=flat-square">
+  <img alt="Version: Windows 1.2.0, Mac 1.0.0" src="https://img.shields.io/badge/version-Windows%201.2.0%20%C2%B7%20Mac%201.0.0-0a84ff?style=flat-square">
   <img alt="macOS 15+" src="https://img.shields.io/badge/macOS-15%2B-1d1d1f?style=flat-square&logo=apple&logoColor=white">
   <img alt="Apple silicon" src="https://img.shields.io/badge/Apple-silicon-1d1d1f?style=flat-square">
   <img alt="Windows 10 and 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?style=flat-square">
@@ -73,7 +73,7 @@ Hold the right Option key (right Alt on Windows), speak, let go — the text app
 
 **Mac**
 
-1. [Download](https://github.com/DDChen666/moqi-voice-typing/releases/tag/v1.0.0) `Moqi_1.0.0_aarch64.dmg` and drag Moqi into Applications. The Mac is on 1.0.0 for now; 1.1.0's new features follow in a later Mac build.
+1. [Download](https://github.com/DDChen666/moqi-voice-typing/releases/tag/v1.0.0) `Moqi_1.0.0_aarch64.dmg` and drag Moqi into Applications. The Mac is on 1.0.0 for now; the features of 1.1.0 and 1.2.0 follow in a later Mac build.
 2. The first launch is blocked because Moqi isn't signed with a paid Apple Developer ID. Open **System Settings → Privacy & Security** and click **Open Anyway**. If macOS says the app "is damaged", run `xattr -dr com.apple.quarantine /Applications/Moqi.app` in Terminal.
 3. Follow the three setup steps: allow permissions, choose Raw or Tidy, and try a sentence.
 
@@ -81,7 +81,7 @@ Requires an M1 or later Mac with macOS 15 or later.
 
 **Windows**
 
-1. [Download](https://github.com/DDChen666/moqi-voice-typing/releases/latest) `Moqi_1.1.0_x64-setup.exe` and open it.
+1. [Download](https://github.com/DDChen666/moqi-voice-typing/releases/latest) `Moqi_1.2.0_x64-setup.exe` and open it.
 2. Windows shows a blue "Windows protected your PC" screen because Moqi has no paid code-signing certificate: click **More info**, then **Run anyway**.
 3. Follow the installer, then the three setup steps.
 
@@ -97,7 +97,7 @@ Hold right ⌥ Option (right Alt on Windows) to dictate, double-tap for hands-fr
 
 ## Roadmap
 
-- [ ] **Learns your words** — fix a word once and Moqi gets it right next time. In 1.1.0, "learn from corrections" picks up a fix you make twice; recognition-side vocabulary is on the `v1.1` branch, not in a release yet (English terms correct 71% → 87%).
+- [x] **Learns your words** — fix a misheard word once and Moqi gets it right next time; rewordings and common words take two fixes. The dictionary also guides recognition: English terms correct 71% → 82% (Windows 1.2.0; the Mac follows).
 - [x] **Windows** (1.1.0)
 - [x] **On-device clean-up** with a small local language model, so not even text leaves your computer (1.1.0, through Ollama or LM Studio).
 - [ ] **Learns your typing habits** (spaces vs. line breaks, punctuation), off by default.

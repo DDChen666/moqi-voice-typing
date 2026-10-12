@@ -21,7 +21,7 @@
 </p>
 
 <p align="center">
-  <img alt="版本：Windows 1.1.0、Mac 1.0.0" src="https://img.shields.io/badge/%E7%89%88%E6%9C%AC-Windows%201.1.0%20%C2%B7%20Mac%201.0.0-0a84ff?style=flat-square">
+  <img alt="版本：Windows 1.2.0、Mac 1.0.0" src="https://img.shields.io/badge/%E7%89%88%E6%9C%AC-Windows%201.2.0%20%C2%B7%20Mac%201.0.0-0a84ff?style=flat-square">
   <img alt="macOS 15+" src="https://img.shields.io/badge/macOS-15%2B-1d1d1f?style=flat-square&logo=apple&logoColor=white">
   <img alt="Apple 晶片" src="https://img.shields.io/badge/Apple-%E6%99%B6%E7%89%87-1d1d1f?style=flat-square">
   <img alt="Windows 10、11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?style=flat-square">
@@ -73,7 +73,7 @@ https://github.com/user-attachments/assets/d8b08c03-3a8e-45ee-86c3-d20c30ad6946
 
 **Mac**
 
-1. [下載](https://github.com/DDChen666/moqi-voice-typing/releases/tag/v1.0.0) `Moqi_1.0.0_aarch64.dmg`，把「默契」拖進「應用程式」。Mac 版目前是 1.0.0，1.1.0 的新功能之後會跟上。
+1. [下載](https://github.com/DDChen666/moqi-voice-typing/releases/tag/v1.0.0) `Moqi_1.0.0_aarch64.dmg`，把「默契」拖進「應用程式」。Mac 版目前是 1.0.0，1.1.0 和 1.2.0 的新功能之後會跟上。
 2. 第一次打開會被 macOS 擋下：默契是免費開源軟體，沒有付費取得 Apple 簽章。到「系統設定」→「隱私權與安全性」，按「**強制打開**」。
 3. 跟著畫面完成三步：允許權限、選「原話」或「整理」、試說一句。
 
@@ -81,7 +81,7 @@ https://github.com/user-attachments/assets/d8b08c03-3a8e-45ee-86c3-d20c30ad6946
 
 **Windows**
 
-1. [下載](https://github.com/DDChen666/moqi-voice-typing/releases/latest) `Moqi_1.1.0_x64-setup.exe`，打開它。
+1. [下載](https://github.com/DDChen666/moqi-voice-typing/releases/latest) `Moqi_1.2.0_x64-setup.exe`，打開它。
 2. 出現藍色的「Windows 已保護您的電腦」：默契沒有購買程式碼簽章憑證。按「**其他資訊**」→「**仍要執行**」。
 3. 跟著安裝精靈按「下一步」，裝好後跟著畫面完成三步。
 
@@ -97,7 +97,7 @@ https://github.com/user-attachments/assets/d8b08c03-3a8e-45ee-86c3-d20c30ad6946
 
 ## 接下來
 
-- [ ] **自動學詞**：你改過一次的字，默契下次就寫對。1.1.0 的「從修改學習」同樣的改法出現兩次就會記住；辨識端的字典在 `v1.1` 分支，還沒放進正式版（英文詞寫對從 71% 提升到 87%）。
+- [x] **自動學詞**：聽錯的字改一次，默契下次就寫對；改說法和常用詞要改兩次。字典也直接幫辨識，英文詞寫對從 71% 提升到 82%（Windows 1.2.0，Mac 之後跟上）。
 - [x] **Windows 版**（1.1.0）
 - [x] **本機整理**：用小型語言模型在電腦上整理，連文字都不送出（1.1.0，接 Ollama、LM Studio）。
 - [ ] **學你的打字習慣**：空格還是換行、標點習慣，預設關閉。

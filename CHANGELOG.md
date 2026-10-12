@@ -2,9 +2,9 @@
 
 格式參考 [Keep a Changelog](https://keepachangelog.com/zh-TW/1.1.0/)，版本號遵循 [語意化版本](https://semver.org/lang/zh-TW/)。
 
-## [未發布]
+## [1.2.0] — 2026-10-12
 
-錯一次、第二次就對：默契會從你改過的字學習，而且學得更快、更準。Mac 版也在這一版跟上 1.1.0 的所有新功能。
+錯一次、第二次就對：默契會從你改過的字學習，而且學得更快、更準。這一版先發布 Windows；Mac 版之後跟上，同時補上 1.1.0 的所有新功能。
 
 ### 學習
 
@@ -115,5 +115,6 @@
 - 讀取輔助使用屬性時，屬性不存在會讓 App 當掉。
 - 鑰匙圈的密碼視窗在說話途中跳出，導致錄音停不下來；改成打開 App 時就先讀取。
 
+[1.2.0]: https://github.com/DDChen666/moqi-voice-typing/releases/tag/v1.2.0
 [1.1.0]: https://github.com/DDChen666/moqi-voice-typing/releases/tag/v1.1.0
 [1.0.0]: https://github.com/DDChen666/moqi-voice-typing/releases/tag/v1.0.0
