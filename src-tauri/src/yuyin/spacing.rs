@@ -7,6 +7,9 @@
 //!   the user's 93 dictations in `results/hist_vocab_v1`). Only capitals
 //!   that stand alone, two or more in a row; "S Premium" and "A 四 B 三" stay.
 //! - No space next to full-width punctuation ("如你所知， Super Grok").
+//! - A space between Chinese and an English word ("会post" → "会 post"), the
+//!   way Qwen3-ASR writes it. SenseVoice, the light model for PCs without a
+//!   GPU (hardware.rs), writes them together.
 //! - 嗎 is only ever the question particle (嘛 is another character), so a
 //!   sentence ending 嗎。 is a question: 嗎？. Other questions (呢, 是不是…)
 //!   can be statements too and are left to the clean-up.
@@ -16,7 +19,30 @@ const NO_SPACE_AFTER: &str = "，。？！：；、）」』】";
 const NO_SPACE_BEFORE: &str = "，。？！：；、（「『【";
 
 pub fn tidy(text: &str) -> String {
-    question_marks(&no_space_by_full_width(&join_spelled(text)))
+    question_marks(&no_space_by_full_width(&space_chinese_and_latin(
+        &join_spelled(text),
+    )))
+}
+
+fn is_han(c: char) -> bool {
+    ('\u{4e00}'..='\u{9fff}').contains(&c) || ('\u{3400}'..='\u{4dbf}').contains(&c)
+}
+
+/// A Chinese character right next to a Latin letter gets a space between
+/// them. Digits are left as they are ("11条", "第3集").
+fn space_chinese_and_latin(text: &str) -> String {
+    let mut out = String::with_capacity(text.len() + 8);
+    let mut prev: Option<char> = None;
+    for c in text.chars() {
+        if let Some(p) = prev {
+            if (is_han(p) && c.is_ascii_alphabetic()) || (p.is_ascii_alphabetic() && is_han(c)) {
+                out.push(' ');
+            }
+        }
+        out.push(c);
+        prev = Some(c);
+    }
+    out
 }
 
 /// 嗎。 → 嗎？ (and Simplified 吗。, which the recognizer writes).
@@ -97,6 +123,19 @@ mod tests {
             tidy("我要讓 Claude Code 跟 Grokbot 那邊"),
             "我要讓 Claude Code 跟 Grokbot 那邊"
         );
+    }
+
+    #[test]
+    fn chinese_and_an_english_word_get_a_space() {
+        // SenseVoice writes them together; Qwen3-ASR already spaces them.
+        assert_eq!(tidy("我今晚应该会post。"), "我今晚应该会 post。");
+        assert_eq!(tidy("用iPhone拍"), "用 iPhone 拍");
+        assert_eq!(tidy("我用 Claude Code 写"), "我用 Claude Code 写");
+        // Digits stay as written.
+        assert_eq!(tidy("把11条检查做成"), "把11条检查做成");
+        assert_eq!(tidy("5G网络"), "5G 网络");
+        // Full-width punctuation is not a gap to fill.
+        assert_eq!(tidy("（post）"), "（post）");
     }
 
     #[test]
