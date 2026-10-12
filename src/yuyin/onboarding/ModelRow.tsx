@@ -1,10 +1,13 @@
-// Yuyin fork: the speech model as the third setup item. Moqi ships one model
-// (M0's pick), so there is no picker: the download starts as soon as the
-// welcome page opens, while the user grants permissions.
+// Yuyin fork: the speech model as the third setup item. There is no picker:
+// the backend says which model this computer can dictate with (M0's pick,
+// or on a Windows PC without a usable GPU a light one, yuyin/hardware.rs),
+// and the download starts as soon as the welcome page opens, while the user
+// grants permissions.
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useModelStore } from "@/stores/modelStore";
 import { useSettings } from "@/hooks/useSettings";
+import { yuyinApi } from "../api";
 import { CheckIcon, DownloadIcon } from "../window/icons";
 import { SmallButton } from "../window/ui";
 
@@ -39,33 +42,43 @@ export function useMoqiModel(preview: boolean): MoqiModelState {
   const [attempt, setAttempt] = useState(0);
   const started = useRef(-1);
   const selected = useRef(false);
+  // Which model, asked once; nothing downloads until the answer is in.
+  const [modelId, setModelId] = useState<string | null>(null);
+  useEffect(() => {
+    yuyinApi
+      .recommendedModel()
+      .then(setModelId)
+      .catch(() => setModelId(MOQI_MODEL_ID));
+  }, []);
+  // A model missing from the list (a catalog change) never strands the
+  // user: they get M0's pick instead.
+  const listed = models.length === 0 || models.some((m) => m.id === modelId);
+  const id = modelId && listed ? modelId : MOQI_MODEL_ID;
 
-  const model = models.find((m) => m.id === MOQI_MODEL_ID);
+  const model = modelId ? models.find((m) => m.id === id) : undefined;
   const ready = !!model?.is_downloaded;
   const busy =
-    MOQI_MODEL_ID in downloadingModels ||
-    MOQI_MODEL_ID in verifyingModels ||
-    MOQI_MODEL_ID in extractingModels;
+    id in downloadingModels || id in verifyingModels || id in extractingModels;
 
   useEffect(() => {
     if (preview || !model || ready || busy || started.current === attempt)
       return;
     started.current = attempt;
     setFailed(false);
-    downloadModel(MOQI_MODEL_ID).then((ok) => {
+    downloadModel(model.id).then((ok) => {
       if (!ok) setFailed(true);
     });
   }, [preview, model, ready, busy, attempt, downloadModel]);
 
   // Selecting it loads it and marks onboarding complete on the backend.
   useEffect(() => {
-    if (preview || !ready || selected.current) return;
-    if (settings && settings.selected_model === MOQI_MODEL_ID) return;
+    if (preview || !ready || !model || selected.current) return;
+    if (settings && settings.selected_model === model.id) return;
     selected.current = true;
-    selectModel(MOQI_MODEL_ID);
-  }, [preview, ready, settings, selectModel]);
+    selectModel(model.id);
+  }, [preview, ready, model, settings, selectModel]);
 
-  const progress = downloadProgress[MOQI_MODEL_ID];
+  const progress = downloadProgress[id];
   return {
     ready,
     busy,
@@ -113,7 +126,9 @@ export const ModelRow: React.FC<{ model: MoqiModelState }> = ({ model }) => {
             ? t("moqi.onboarding.modelFailed")
             : model.busy && model.percent === null
               ? t("moqi.onboarding.modelPreparing")
-              : t("moqi.onboarding.modelHint")}
+              : t("moqi.onboarding.modelHint", {
+                  size: model.total ? bytes(model.total) : "…",
+                })}
         </p>
       </div>
       {model.ready ? (

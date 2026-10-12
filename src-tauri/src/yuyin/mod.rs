@@ -25,6 +25,7 @@ pub mod defaults;
 pub mod field_probe;
 #[cfg(target_os = "windows")]
 pub mod focus_return;
+pub mod hardware;
 pub mod learn;
 pub mod level_boost;
 pub mod output;

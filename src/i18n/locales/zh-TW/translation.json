@@ -1080,7 +1080,7 @@
       "continue": "繼續",
       "continueHint": "上面都準備好了就能繼續",
       "model": "辨識模型",
-      "modelHint": "只下載一次，約 1.5 GB。之後辨識全程在這台電腦上，不需要網路。",
+      "modelHint": "只下載一次，約 {{size}}。之後辨識全程在這台電腦上，不需要網路。",
       "modelPreparing": "下載完成，正在準備…",
       "modelFailed": "下載沒有完成，請確認網路後重試。",
       "modelReady": "已下載",

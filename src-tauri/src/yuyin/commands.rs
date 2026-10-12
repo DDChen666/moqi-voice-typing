@@ -125,6 +125,14 @@ pub async fn yuyin_sync_now(app: AppHandle) -> Result<(), String> {
         .map_err(|e| e.to_string())?
 }
 
+/// The speech model onboarding downloads: the 1.7B model, or on a Windows
+/// PC without a GPU it can use, SenseVoice on the CPU (yuyin/hardware.rs).
+#[tauri::command]
+#[specta::specta]
+pub fn yuyin_recommended_model(app: AppHandle) -> String {
+    super::hardware::model_for_onboarding(&app).to_string()
+}
+
 /// The apps the user recently dictated into, for per-app styles.
 #[tauri::command]
 #[specta::specta]

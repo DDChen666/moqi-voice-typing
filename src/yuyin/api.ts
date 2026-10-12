@@ -159,6 +159,8 @@ export const yuyinApi = {
     invoke<void>("yuyin_set_api_key", { key, baseUrl }),
   testPolish: (text: string) => invoke<string>("yuyin_test_polish", { text }),
   recentApps: () => invoke<RecentApp[]>("yuyin_recent_apps"),
+  /** The speech model this computer dictates with (yuyin/hardware.rs). */
+  recommendedModel: () => invoke<string>("yuyin_recommended_model"),
   /** The models of a server on this computer (Ollama, LM Studio). */
   localModels: (baseUrl: string) =>
     invoke<string[]>("yuyin_local_models", { baseUrl }),

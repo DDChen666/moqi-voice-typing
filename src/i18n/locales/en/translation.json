@@ -1080,7 +1080,7 @@
       "continue": "Continue",
       "continueHint": "Continue once everything above is ready",
       "model": "Speech model",
-      "modelHint": "A one-time 1.5 GB download. After that, recognition runs on this computer, offline.",
+      "modelHint": "A one-time {{size}} download. After that, recognition runs on this computer, offline.",
       "modelPreparing": "Downloaded, getting it ready…",
       "modelFailed": "The download didn't finish. Check your connection and retry.",
       "modelReady": "Downloaded",

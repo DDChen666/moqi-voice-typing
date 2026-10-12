@@ -2210,6 +2210,17 @@ fn transcribe_compute_devices() -> Vec<transcribe_cpp::Device> {
         .collect()
 }
 
+/// Yuyin fork: the memory of each discrete GPU transcribe-cpp can use, in
+/// bytes (0 when the backend does not report it). Integrated GPUs are left
+/// out: which speech model a PC gets depends on these (yuyin/hardware.rs).
+pub fn discrete_gpu_memory() -> Vec<u64> {
+    transcribe_compute_devices()
+        .into_iter()
+        .filter(|d| d.device_type == transcribe_cpp::DeviceType::Gpu)
+        .map(|d| d.memory_total)
+        .collect()
+}
+
 fn available_transcribe_accelerators(gpu_disabled: bool) -> Vec<String> {
     if gpu_disabled {
         vec!["cpu".to_string()]

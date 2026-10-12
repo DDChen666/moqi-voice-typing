@@ -716,6 +716,7 @@ pub fn run(cli_args: CliArgs) {
             yuyin::commands::yuyin_sync_now,
             yuyin::commands::yuyin_local_models,
             yuyin::commands::yuyin_recent_apps,
+            yuyin::commands::yuyin_recommended_model,
             yuyin::commands::yuyin_report_error,
             yuyin::commands::yuyin_stats,
             yuyin::commands::yuyin_history_meta,
@@ -1121,6 +1122,10 @@ pub fn run(cli_args: CliArgs) {
             app.manage(TranscriptionCoordinator::new(app_handle.clone()));
 
             initialize_core_logic(&app_handle);
+            // Yuyin fork: a PC without a GPU the 1.7B model can use gets the
+            // light model instead, before it is preloaded (yuyin/hardware.rs).
+            #[cfg(target_os = "windows")]
+            yuyin::hardware::prepare_at_launch(&app_handle);
             // Yuyin fork: load and warm the model now on Windows, so the first
             // dictation after a restart isn't the slow one (yuyin/warmup.rs).
             #[cfg(target_os = "windows")]

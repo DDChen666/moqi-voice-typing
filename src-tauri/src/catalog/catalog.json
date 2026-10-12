@@ -1771,7 +1771,7 @@
         {"filename": "SenseVoiceSmall-F16.gguf", "quant": "F16", "size_bytes": 470412128, "sha256": "dc172fd5ffaff0a396393cd4edd82e18403c53f8f5873bcc544ba012b70598f6"},
         {"filename": "SenseVoiceSmall-F32.gguf", "quant": "F32", "size_bytes": 936617824, "sha256": "dda511c3eac009568643b5c64541468d62be2e2a59700113f49c72675464d13d"}
       ],
-      "default_quant": "Q8_0",
+      "default_quant": "Q4_K_M",
       "recommended": false,
       "recommended_rank": null
     },
