@@ -85,7 +85,7 @@ Requires an M1 or later Mac with macOS 15 or later.
 2. Windows shows a blue "Windows protected your PC" screen because Moqi has no paid code-signing certificate: click **More info**, then **Run anyway**.
 3. Follow the installer, then the three setup steps.
 
-Requires Windows 10 or 11 (64-bit) and a dedicated graphics card (NVIDIA, AMD or Intel Arc). On the CPU alone a sentence takes several seconds, too slow for daily use; laptops with only integrated graphics are untested. The interface is available in Traditional Chinese and English.
+Requires Windows 10 or 11 (64-bit) and runs on any PC: with a dedicated graphics card of 4 GB or more it uses the most accurate speech model (about 1.5 GB); without one, Moqi switches by itself to a small model that is fast on the CPU (about 150 MB), with somewhat more mistakes, English terms especially. The interface is available in Traditional Chinese and English.
 
 |                        | What it does                                                    | Needs                                                                                     |
 | ---------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
