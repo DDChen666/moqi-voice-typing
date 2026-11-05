@@ -318,7 +318,38 @@ pub fn mark_mic_ready() {
 }
 
 pub fn mark_released() {
-    with_session(|s| s.released = Some(Instant::now()));
+    let mut pid = None;
+    with_session(|s| {
+        s.released = Some(Instant::now());
+        pid = s.front.as_ref().map(|f| f.pid);
+    });
+    // The field as it was before the paste, for super::paste_check. Read in
+    // the background: the recognizer and the clean-up take longer than this.
+    let generation = generation();
+    if let Ok(mut before) = FIELD_BEFORE.lock() {
+        *before = None;
+    }
+    if let Some(pid) = pid {
+        std::thread::spawn(move || {
+            let value = platform::focused_field(pid).and_then(|(_, v)| v);
+            if let Ok(mut before) = FIELD_BEFORE.lock() {
+                *before = Some((generation, value));
+            }
+        });
+    }
+}
+
+/// What the focused field held when the key was released (this dictation).
+static FIELD_BEFORE: Mutex<Option<(u64, Option<String>)>> = Mutex::new(None);
+
+/// The text of the field the user dictated into, read at release, before
+/// anything was pasted. None if it couldn't be read (or not yet).
+pub fn field_before() -> Option<String> {
+    let before = FIELD_BEFORE.lock().ok()?;
+    match before.as_ref() {
+        Some((g, value)) if *g == generation() => value.clone(),
+        _ => None,
+    }
 }
 
 /// Whether the key was released within [`MIN_HOLD`] of being pressed.

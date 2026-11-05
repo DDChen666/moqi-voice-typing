@@ -108,6 +108,10 @@ struct MacPending {
     /// The transcript, for the `preserve_transcript` re-write at settle time.
     transcript: String,
     settled: bool,
+    /// Yuyin fork: the paste was sent a second time, with the transcript as
+    /// plain text; our promise's owner is gone, so only `change_count` says
+    /// whether the clipboard is still ours (see `yuyin::paste_check`).
+    retried: bool,
 }
 
 /// The transaction currently holding the clipboard, if any. A new paste
@@ -154,8 +158,8 @@ fn settle(
         }
     }
 
-    let still_ours =
-        !ownership_lost && NSPasteboard::generalPasteboard().changeCount() == p.change_count;
+    let same_count = NSPasteboard::generalPasteboard().changeCount() == p.change_count;
+    let still_ours = (p.retried || !ownership_lost) && same_count;
     if !still_ours {
         info!("[reliable-paste] clipboard changed externally; leaving it untouched");
     } else if p.preserve_transcript {
@@ -193,11 +197,32 @@ fn flush_pending(app_handle: &AppHandle, enigo: &mut enigo::Enigo) {
     }
 }
 
+/// What the waiter decided once it stopped waiting.
+enum Outcome {
+    /// Restore the previous clipboard (guarded), as upstream does.
+    Restore,
+    /// Yuyin fork: the paste didn't land; leave the transcript on the
+    /// clipboard and tell the user.
+    Keep,
+}
+
 fn spawn_waiter(pending: Arc<Mutex<MacPending>>, app_handle: AppHandle) {
+    // Yuyin fork: check the field itself (yuyin/paste_check.rs).
+    use crate::yuyin::paste_check::{self, Seen};
+    let pid = crate::yuyin::session::front_app().map(|f| f.pid);
+    let before = crate::yuyin::session::field_before();
+    let generation = crate::yuyin::session::generation();
     thread::spawn(move || {
+        let text = match pending.lock() {
+            Ok(p) => p.transcript.clone(),
+            Err(_) => return,
+        };
+        let mut chord_at = Instant::now();
+        let mut last_look: Option<Instant> = None;
+        let mut seen = Seen::Unknown;
         let outcome = loop {
             thread::sleep(Duration::from_millis(15));
-            let (decision, state_snapshot) = {
+            let (decision, snapshot, retried) = {
                 let p = match pending.lock() {
                     Ok(p) => p,
                     Err(_) => return,
@@ -206,6 +231,7 @@ fn spawn_waiter(pending: Arc<Mutex<MacPending>>, app_handle: AppHandle) {
                     // A newer paste settled this transaction already.
                     return;
                 }
+                let retried = p.retried;
                 let result = match p.state.lock() {
                     Ok(st) => {
                         let now = Instant::now();
@@ -218,28 +244,77 @@ fn spawn_waiter(pending: Arc<Mutex<MacPending>>, app_handle: AppHandle) {
                     }
                     Err(_) => return,
                 };
-                result
+                // After a retry our owner is gone: only the count tells
+                // whether the user copied something else.
+                let external = if retried {
+                    NSPasteboard::generalPasteboard().changeCount() != p.change_count
+                } else {
+                    result.1 .1
+                };
+                (result.0, (result.1 .0, external, result.1 .2), retried)
             };
+            let (receipt_seen, ownership_lost, injection_failed) = snapshot;
+            if ownership_lost {
+                info!("[reliable-paste] settling: clipboard ownership lost");
+                break Outcome::Restore;
+            }
+            if let Some(pid) = pid {
+                if last_look.is_none_or(|t| t.elapsed() >= paste_check::EVERY) {
+                    last_look = Some(Instant::now());
+                    seen = paste_check::look(pid, before.as_deref(), &text);
+                    if seen == Seen::Pasted {
+                        info!(
+                            "[reliable-paste] settling: the field shows the paste ({}ms after chord)",
+                            chord_at.elapsed().as_millis()
+                        );
+                        break Outcome::Restore;
+                    }
+                }
+            }
+            if chord_at.elapsed() < paste_check::CHECK_FOR {
+                continue;
+            }
+            match seen {
+                Seen::Unchanged if !retried => {
+                    info!("[reliable-paste] the field is unchanged; pasting again");
+                    retry(&pending, &app_handle);
+                    chord_at = Instant::now();
+                    continue;
+                }
+                Seen::Unchanged | Seen::Missing => {
+                    info!("[reliable-paste] the paste didn't land ({seen:?}); leaving it on the clipboard");
+                    break Outcome::Keep;
+                }
+                Seen::Pasted | Seen::Unknown => {}
+            }
             if let WaitDecision::Finish = decision {
-                break state_snapshot;
+                if receipt_seen {
+                    info!("[reliable-paste] settling: reads went quiet");
+                } else if injection_failed {
+                    info!("[reliable-paste] settling: chord injection failed, restoring quickly");
+                } else {
+                    info!("[reliable-paste] settling: no read within timeout, restoring anyway");
+                }
+                break Outcome::Restore;
             }
         };
-
-        let (receipt_seen, ownership_lost, injection_failed) = outcome;
-        if ownership_lost {
-            info!("[reliable-paste] settling: clipboard ownership lost");
-        } else if receipt_seen {
-            info!("[reliable-paste] settling: reads went quiet");
-        } else if injection_failed {
-            info!("[reliable-paste] settling: chord injection failed, restoring quickly");
-        } else {
-            info!("[reliable-paste] settling: no read within timeout, restoring anyway");
-        }
 
         let pending_for_finish = pending.clone();
         let app_for_finish = app_handle.clone();
         let _ = app_handle.run_on_main_thread(move || {
+            if let Outcome::Keep = outcome {
+                if let Ok(mut p) = pending_for_finish.lock() {
+                    p.preserve_transcript = true;
+                    p.auto_submit = false;
+                }
+            }
             settle(&pending_for_finish, &app_for_finish, None);
+            // Not over the pill of a dictation that started since.
+            if matches!(outcome, Outcome::Keep) && crate::yuyin::session::generation() == generation
+            {
+                crate::overlay::show_result_overlay(&app_for_finish, "copied");
+                crate::yuyin::output::hide_notice_later(&app_for_finish);
+            }
             if let Ok(mut slot) = PENDING.lock() {
                 let is_us = slot
                     .as_ref()
@@ -251,6 +326,34 @@ fn spawn_waiter(pending: Arc<Mutex<MacPending>>, app_handle: AppHandle) {
             }
         });
     });
+}
+
+/// Yuyin fork: send the paste once more, the transcript now plain text on
+/// the clipboard (no promise), and wait for it on the main thread.
+fn retry(pending: &Arc<Mutex<MacPending>>, app_handle: &AppHandle) {
+    let (done_tx, done_rx) = std::sync::mpsc::channel();
+    let pending = pending.clone();
+    let app = app_handle.clone();
+    let _ = app_handle.run_on_main_thread(move || {
+        if let Ok(mut p) = pending.lock() {
+            if !p.settled {
+                let _ = app.clipboard().write_text(&p.transcript);
+                p.change_count = NSPasteboard::generalPasteboard().changeCount();
+                p.retried = true;
+                if let Some(enigo_state) = app.try_state::<EnigoState>() {
+                    if let Ok(mut e) = enigo_state.0.lock() {
+                        let method = crate::settings::get_settings(&app).paste_method;
+                        let method = crate::yuyin::output::paste_method(method);
+                        if let Err(err) = send_chord(&mut e, &method) {
+                            error!("[reliable-paste] failed to send the second paste: {err}");
+                        }
+                    }
+                }
+            }
+        }
+        let _ = done_tx.send(());
+    });
+    let _ = done_rx.recv_timeout(Duration::from_secs(2));
 }
 
 pub(super) fn run(
@@ -326,6 +429,7 @@ pub(super) fn run(
         preserve_transcript: clipboard_handling == ClipboardHandling::CopyToClipboard,
         transcript: text.to_string(),
         settled: false,
+        retried: false,
     }));
     if let Ok(mut slot) = PENDING.lock() {
         *slot = Some(pending.clone());

@@ -40,6 +40,11 @@ pub fn show_failed(app: &AppHandle) {
     hide_later(app, FAILED_DURATION);
 }
 
+/// Hide the "copied" notice after the usual time.
+pub fn hide_notice_later(app: &AppHandle) {
+    hide_later(app, NOTICE_DURATION);
+}
+
 fn hide_later(app: &AppHandle, after: Duration) {
     let generation = session::generation();
     let app = app.clone();

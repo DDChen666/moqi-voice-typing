@@ -43,13 +43,13 @@ struct Record {
 }
 
 /// Fields reflow and trim, so compare without whitespace.
-fn squash(s: &str) -> String {
+pub(crate) fn squash(s: &str) -> String {
     s.chars().filter(|c| !c.is_whitespace()).collect()
 }
 
 /// Whether the field shows the pasted text. Long pastes are matched by their
 /// first and last 20 characters, since apps may reformat the middle.
-fn shows(field: &str, pasted: &str) -> bool {
+pub(crate) fn shows(field: &str, pasted: &str) -> bool {
     let f = squash(field);
     let p: Vec<char> = squash(pasted).chars().collect();
     if p.is_empty() {

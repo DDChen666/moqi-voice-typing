@@ -29,6 +29,7 @@ pub mod hardware;
 pub mod learn;
 pub mod level_boost;
 pub mod output;
+pub mod paste_check;
 pub mod polish;
 pub mod prompt;
 pub mod replay;
