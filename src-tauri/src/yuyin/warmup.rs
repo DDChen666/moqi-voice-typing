@@ -19,6 +19,11 @@
 //! footprint was in swap four minutes after a dictation, and the first one
 //! after a rest took 5–10 s to transcribe 3–5 s of audio (0.6 s otherwise).
 //! Warming at the press pages the weights back in while the user speaks.
+//! It still cost the first dictation after a rest seconds (the user: "every
+//! time, even the first, should be fast"), so on macOS the model is also
+//! kept warm: every [`KEEP_WARM_EVERY`] of rest it transcribes the short
+//! clip in the background (about 0.3 s of GPU), which keeps its pages in
+//! use and out of swap ([`keep_warm`]). It is loaded at launch too.
 
 use std::f32::consts::TAU;
 use std::sync::Mutex;
@@ -26,12 +31,9 @@ use std::time::{Duration, Instant, SystemTime};
 
 use log::{info, warn};
 
-#[cfg(target_os = "windows")]
 use crate::managers::model::ModelManager;
 use crate::managers::transcription::TranscriptionManager;
-#[cfg(target_os = "windows")]
 use std::sync::Arc;
-#[cfg(target_os = "windows")]
 use tauri::{AppHandle, Manager};
 
 /// Load the speech model at launch, which also warms it (see [`start`]).
@@ -39,8 +41,8 @@ use tauri::{AppHandle, Manager};
 /// dictation after every restart would wait for the load and the kernel
 /// build. The model stays loaded anyway (Moqi never unloads it), so this
 /// only moves the wait to before the user needs it. Skipped until the model
-/// has been downloaded (first-run onboarding loads it itself).
-#[cfg(target_os = "windows")]
+/// has been downloaded (first-run onboarding loads it itself). On macOS the
+/// load itself took the first dictation after every restart several seconds.
 pub fn preload_at_launch(app: &AppHandle) {
     let selected = crate::settings::get_settings(app).selected_model;
     let downloaded = app
@@ -138,6 +140,53 @@ pub fn start(manager: &TranscriptionManager) {
     run(manager, &CLIPS);
 }
 
+/// How long the model may rest before [`keep_warm`] runs it. Under the 3 min
+/// after which the user's dictations started coming out slow.
+#[cfg(target_os = "macos")]
+const KEEP_WARM_EVERY: Duration = Duration::from_secs(2 * 60);
+
+/// Whether a rest since `last` is long enough for a keep-warm run.
+#[cfg(any(target_os = "macos", test))]
+fn due(last: Option<SystemTime>, now: SystemTime, every: Duration) -> bool {
+    match last {
+        None => true,
+        Some(t) => now.duration_since(t).is_ok_and(|idle| idle >= every),
+    }
+}
+
+/// Keep the loaded model out of swap (macOS): a background thread that runs
+/// the short clip after every [`KEEP_WARM_EVERY`] of rest. Started once,
+/// when the model is first loaded; it skips while the model is unloaded.
+#[cfg(target_os = "macos")]
+pub fn keep_warm(manager: &TranscriptionManager) {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static STARTED: AtomicBool = AtomicBool::new(false);
+    if STARTED.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let manager = manager.clone();
+    let spawned = std::thread::Builder::new()
+        .name("model-keep-warm".into())
+        .spawn(move || loop {
+            std::thread::sleep(Duration::from_secs(20));
+            let now = SystemTime::now();
+            let last = *LAST_USE.lock().unwrap_or_else(|e| e.into_inner());
+            if !due(last, now, KEEP_WARM_EVERY) || !manager.is_model_loaded() {
+                continue;
+            }
+            *LAST_USE.lock().unwrap_or_else(|e| e.into_inner()) = Some(now);
+            let started = Instant::now();
+            match super::asr_vocab::without(|| manager.transcribe(clip(CLIPS[0]))) {
+                Ok(_) => log::debug!("model kept warm in {} ms", started.elapsed().as_millis()),
+                Err(e) => warn!("keeping the model warm failed: {e}"),
+            }
+        });
+    if let Err(e) = spawned {
+        STARTED.store(false, Ordering::SeqCst);
+        warn!("could not start keeping the model warm: {e}");
+    }
+}
+
 fn run(manager: &TranscriptionManager, clips: &[f32]) {
     let manager = manager.clone();
     let clips = clips.to_vec();
@@ -146,7 +195,7 @@ fn run(manager: &TranscriptionManager, clips: &[f32]) {
         .spawn(move || {
             for seconds in clips {
                 let started = Instant::now();
-                match manager.transcribe(clip(seconds)) {
+                match super::asr_vocab::without(|| manager.transcribe(clip(seconds))) {
                     Ok(_) => info!(
                         "model warm-up: {seconds}s clip took {} ms",
                         started.elapsed().as_millis()
@@ -183,5 +232,16 @@ mod tests {
         assert!(note_use(t0 + Duration::from_secs(60) + IDLE_BEFORE_REWARM));
         // A clock that went backwards is not a rest.
         assert!(!note_use(t0));
+    }
+
+    #[test]
+    fn keeps_warm_only_after_a_rest() {
+        let every = Duration::from_secs(120);
+        let t0 = SystemTime::UNIX_EPOCH + Duration::from_secs(1_000_000);
+        assert!(due(None, t0, every));
+        assert!(!due(Some(t0), t0 + Duration::from_secs(119), every));
+        assert!(due(Some(t0), t0 + every, every));
+        // A clock that went backwards is not a rest.
+        assert!(!due(Some(t0 + every), t0, every));
     }
 }

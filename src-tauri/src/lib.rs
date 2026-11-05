@@ -1126,9 +1126,8 @@ pub fn run(cli_args: CliArgs) {
             // light model instead, before it is preloaded (yuyin/hardware.rs).
             #[cfg(target_os = "windows")]
             yuyin::hardware::prepare_at_launch(&app_handle);
-            // Yuyin fork: load and warm the model now on Windows, so the first
-            // dictation after a restart isn't the slow one (yuyin/warmup.rs).
-            #[cfg(target_os = "windows")]
+            // Yuyin fork: load (and on Windows warm) the model now, so the
+            // first dictation after a restart isn't the slow one (yuyin/warmup.rs).
             yuyin::warmup::preload_at_launch(&app_handle);
             // Yuyin fork: remember the user's window for the tray's "paste
             // last" (yuyin/focus_return.rs). Setup runs on the main thread.

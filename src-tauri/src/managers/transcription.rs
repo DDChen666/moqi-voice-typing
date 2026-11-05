@@ -502,6 +502,9 @@ impl TranscriptionManager {
         // first dictation (Vulkan on Windows; see yuyin/warmup.rs).
         #[cfg(target_os = "windows")]
         crate::yuyin::warmup::start(self);
+        // Yuyin fork: and keep it out of swap on macOS (yuyin/warmup.rs).
+        #[cfg(target_os = "macos")]
+        crate::yuyin::warmup::keep_warm(self);
         Ok(())
     }
 

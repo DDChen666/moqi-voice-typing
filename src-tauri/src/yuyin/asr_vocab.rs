@@ -42,8 +42,27 @@ static TO_SIMPLIFIED: Lazy<Option<OpenCC>> = Lazy::new(|| {
         .ok()
 });
 
+thread_local! {
+    /// Set while [`without`] runs on this thread.
+    static OFF: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Run `f` with no dictionary for the recognizer on this thread. The model
+/// warm-up uses it: given the dictionary, Qwen3-ASR recited all 50 words for
+/// the warm-up's synthetic clip (it holds no speech), then ran again without
+/// them; a 1.5 s clip took 14.3 s and the user's dictation waited behind it.
+pub fn without<T>(f: impl FnOnce() -> T) -> T {
+    OFF.with(|off| off.set(true));
+    let out = f();
+    OFF.with(|off| off.set(false));
+    out
+}
+
 /// The words to give the recognizer, most recently used first.
 pub fn words(app: &AppHandle) -> Vec<String> {
+    if OFF.with(|off| off.get()) {
+        return Vec::new();
+    }
     match std::env::var("YUYIN_ASR_VOCAB") {
         Ok(v) if v == "0" => Vec::new(),
         Ok(path) if !path.is_empty() => {
